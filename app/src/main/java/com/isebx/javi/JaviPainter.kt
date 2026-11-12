@@ -98,6 +98,7 @@ class JaviPainter {
     fun draw(c: Canvas, j: Javi) {
         c.save()
         c.scale(j.dir, 1f)
+        if (j.sway > 0.01f || j.sway < -0.01f) c.rotate(j.sway, -8f, -Javi.HANG_LEN)
 
         // Cola
         stroke.strokeWidth = 11f

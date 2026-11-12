@@ -14,6 +14,7 @@ import android.content.pm.ServiceInfo
 import android.content.res.Configuration
 import android.graphics.PixelFormat
 import android.graphics.Point
+import android.graphics.Rect
 import android.graphics.drawable.Icon
 import android.os.Build
 import android.os.Handler
@@ -32,6 +33,7 @@ import java.util.Calendar
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.random.Random
 
 /** Mantiene a Javi caminando sobre la pantalla, por encima de las demás apps. */
 class PetService : Service() {
@@ -39,6 +41,9 @@ class PetService : Service() {
     companion object {
         @Volatile
         var running = false
+
+        @Volatile
+        var instance: PetService? = null
 
         const val ACTION_FEED = "com.isebx.javi.FEED"
         const val ACTION_PET = "com.isebx.javi.PET"
@@ -73,6 +78,9 @@ class PetService : Service() {
     private var lastNs = 0L
     private var active = true
     private var nightCheck = 0f
+    private var iconTimer = 12f
+    private var perchRect: Rect? = null
+    private var lastTapReact = 0L
 
     private val frame = object : Choreographer.FrameCallback {
         override fun doFrame(ns: Long) {
@@ -86,6 +94,7 @@ class PetService : Service() {
                 javi.night = h >= 23 || h < 7
             }
             stepYarn(dt)
+            stepIcons(dt)
             javi.update(dt)
             place()
             view?.invalidate()
@@ -133,6 +142,7 @@ class PetService : Service() {
             registerReceiver(screenReceiver, filter)
         }
         running = true
+        instance = this
         resumeLoop()
     }
 
@@ -159,6 +169,7 @@ class PetService : Service() {
 
     override fun onDestroy() {
         running = false
+        instance = null
         active = false
         handler.removeCallbacksAndMessages(null)
         Choreographer.getInstance().removeFrameCallback(frame)
@@ -245,6 +256,7 @@ class PetService : Service() {
         var downX = 0f
         var downY = 0f
         var dragging = false
+        var rubbing = false
         var longFired = false
         val longPress = Runnable {
             longFired = true
@@ -256,16 +268,27 @@ class PetService : Service() {
                     downX = e.rawX
                     downY = e.rawY
                     dragging = false
+                    rubbing = false
                     longFired = false
                     handler.postDelayed(longPress, 450L)
                 }
                 MotionEvent.ACTION_MOVE -> {
-                    if (!dragging && !longFired &&
+                    if (!dragging && !rubbing && !longFired &&
                         (abs(e.rawX - downX) > slop || abs(e.rawY - downY) > slop)
                     ) {
                         handler.removeCallbacks(longPress)
-                        dragging = true
-                        javi.hold()
+                        // De lado a lado es una caricia; hacia arriba o abajo lo levanta.
+                        if (abs(e.rawX - downX) > abs(e.rawY - downY) * 1.5f) {
+                            rubbing = true
+                            Store.addMimo(this)
+                        } else {
+                            dragging = true
+                            perchRect = null
+                            javi.hold()
+                        }
+                    }
+                    if (rubbing) {
+                        javi.rub(e.rawX / unit)
                     }
                     if (dragging) {
                         javi.x = e.rawX / unit
@@ -277,6 +300,8 @@ class PetService : Service() {
                     handler.removeCallbacks(longPress)
                     if (dragging) {
                         javi.drop()
+                    } else if (rubbing) {
+                        rubbing = false
                     } else if (!longFired && e.actionMasked == MotionEvent.ACTION_UP) {
                         javi.pet()
                         Store.addMimo(this)
@@ -328,6 +353,59 @@ class PetService : Service() {
         measure()
         addWindow()
         if (hadYarn) addYarnWindow()
+    }
+
+    // ---------- Íconos y toques en la pantalla ----------
+
+    /** Cada tanto, si ve íconos, salta a sentarse sobre uno o a colgarse. */
+    private fun stepIcons(dt: Float) {
+        val target = perchRect
+        if (target != null) {
+            val up = javi.perched || javi.st == Javi.St.JUMPTO
+            if (!up) {
+                perchRect = null
+            } else if (!JaviEyes.icons.contains(target)) {
+                perchRect = null
+                javi.drop()
+            }
+            return
+        }
+        iconTimer -= dt
+        if (iconTimer > 0f) return
+        iconTimer = 25f + Random.nextFloat() * 30f
+        if (!javi.idle || yarn.active || wheel != null) return
+        val list = JaviEyes.icons
+        if (list.isEmpty()) return
+        val r = list[Random.nextInt(list.size)]
+        val grip = (floorY - (r.top + r.height() * 0.05f)) / unit
+        val maxAlt = floorY * 0.82f / unit
+        if (grip < 40f || grip > maxAlt) return
+        val hang = Random.nextBoolean() && grip - Javi.HANG_LEN > 25f
+        val tx = r.exactCenterX() / unit
+        perchRect = r
+        if (hang) {
+            javi.jumpTo(tx + 8f * (if (tx >= javi.x) 1f else -1f), grip - Javi.HANG_LEN, true)
+        } else {
+            javi.jumpTo(tx, grip, false)
+        }
+    }
+
+    /** JaviEyes avisa que tocaron algo en la pantalla (coordenadas en píxeles). */
+    fun onScreenTap(px: Float, py: Float) {
+        handler.post {
+            val now = SystemClock.uptimeMillis()
+            if (view == null || wheel != null || yarn.active) return@post
+            if (now - lastTapReact < 7000L || !javi.idle) return@post
+            if (py < 0f) return@post
+            val r = Random.nextFloat()
+            if (r < 0.45f) {
+                lastTapReact = now
+                javi.goTo(px / unit, Javi.St.POUNCE)
+            } else if (r < 0.75f) {
+                lastTapReact = now
+                javi.goTo(px / unit, Javi.St.BEG)
+            }
+        }
     }
 
     // ---------- Ovillo ----------

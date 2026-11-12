@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Javi</string>
+    <string name="eyes_description">Javi usa este permiso solo para saber dónde están los íconos y dónde tocás la pantalla, así puede saltar, colgarse de un ícono y acercarse a pedir caricias. No lee, no guarda y no envía nada.</string>
 </resources>

@@ -29,6 +29,7 @@ class MainActivity : Activity() {
     private lateinit var preview: PetView
     private lateinit var toggle: Button
     private lateinit var info: TextView
+    private lateinit var eyes: Button
     private var lastNs = 0L
     private var looping = false
 
@@ -153,6 +154,26 @@ class MainActivity : Activity() {
             ).apply { topMargin = dp(12) }
         )
 
+        eyes = Button(this).apply {
+            setAllCaps(false)
+            textSize = 14f
+            setOnClickListener {
+                Toast.makeText(
+                    this@MainActivity,
+                    "Buscá \"Javi\" en la lista (a veces dentro de \"Apps descargadas\") y activalo",
+                    Toast.LENGTH_LONG
+                ).show()
+                startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            }
+        }
+        root.addView(
+            eyes,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        )
+
         setContentView(root)
     }
 
@@ -174,6 +195,14 @@ class MainActivity : Activity() {
     private fun refresh() {
         toggle.text = if (PetService.running) "Guardar a Javi" else "Sacar a Javi a la pantalla"
         info.text = "Mimos: ${Store.mimos(this)}   ·   Comidas: ${Store.comidas(this)}"
+        val enabled = Settings.Secure.getString(
+            contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+        ) ?: ""
+        eyes.text = if (enabled.contains("$packageName/")) {
+            "Javi ya ve los íconos"
+        } else {
+            "Dejar que Javi vea los íconos"
+        }
     }
 
     private fun send(action: String, kind: Int = -1) {
