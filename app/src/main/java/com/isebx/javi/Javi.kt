@@ -265,6 +265,12 @@ class Javi {
 
     fun hold() { if (st != St.HELD) set(St.HELD) }
 
+    /** Lo soltaron en lo alto: se agarra de donde está y queda colgado. */
+    fun grab() {
+        vy = 0f
+        set(St.HANG)
+    }
+
     fun drop() {
         vy = 0f
         set(St.FALL)

@@ -249,6 +249,7 @@ class PetService : Service() {
             (Javi.HALF_W * 2f * unit).toInt(),
             ((Javi.TOP + Javi.BOTTOM) * unit).toInt()
         )
+        params.flags = params.flags or WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH
         lp = params
         view = v
 
@@ -264,6 +265,7 @@ class PetService : Service() {
         }
         v.setOnTouchListener { _, e ->
             when (e.actionMasked) {
+                MotionEvent.ACTION_OUTSIDE -> onOutsideTouch()
                 MotionEvent.ACTION_DOWN -> {
                     downX = e.rawX
                     downY = e.rawY
@@ -299,7 +301,8 @@ class PetService : Service() {
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                     handler.removeCallbacks(longPress)
                     if (dragging) {
-                        javi.drop()
+                        // Si lo sueltan en lo alto (sobre un ícono), se queda colgado un rato.
+                        if (javi.alt > 70f) javi.grab() else javi.drop()
                     } else if (rubbing) {
                         rubbing = false
                     } else if (!longFired && e.actionMasked == MotionEvent.ACTION_UP) {
@@ -405,6 +408,26 @@ class PetService : Service() {
                 lastTapReact = now
                 javi.goTo(px / unit, Javi.St.BEG)
             }
+        }
+    }
+
+    /**
+     * Tocaron la pantalla fuera de Javi. Android no dice dónde, solo que pasó:
+     * cada tanto se acerca al medio a pedir caricias o pega un saltito.
+     */
+    private fun onOutsideTouch() {
+        if (JaviEyes.connected) return
+        val now = SystemClock.uptimeMillis()
+        if (wheel != null || yarn.active || !javi.idle) return
+        if (now - lastTapReact < 12000L) return
+        val r = Random.nextFloat()
+        val mid = screenW / unit * (0.3f + Random.nextFloat() * 0.4f)
+        if (r < 0.18f) {
+            lastTapReact = now
+            javi.goTo(mid, Javi.St.BEG)
+        } else if (r < 0.30f) {
+            lastTapReact = now
+            javi.goTo(mid, Javi.St.POUNCE)
         }
     }
 

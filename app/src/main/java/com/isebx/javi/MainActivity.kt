@@ -4,6 +4,7 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.AlertDialog
+import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Typeface
@@ -73,7 +74,7 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER
         })
         root.addView(TextView(this).apply {
-            text = "Tocalo para mimarlo. En la pantalla, mantenelo apretado para ver sus acciones."
+            text = "Mantenelo apretado para ver sus acciones. Acarici\u00e1lo de lado a lado. Soltalo sobre un \u00edcono y se cuelga."
             textSize = 15f
             setTextColor(brown)
             gravity = Gravity.CENTER
@@ -166,6 +167,13 @@ class MainActivity : Activity() {
                 startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
             }
         }
+        val hasEyes = try {
+            packageManager.getServiceInfo(ComponentName(this, JaviEyes::class.java), 0)
+            true
+        } catch (e: PackageManager.NameNotFoundException) {
+            false
+        }
+        if (!hasEyes) eyes.visibility = View.GONE
         root.addView(
             eyes,
             LinearLayout.LayoutParams(

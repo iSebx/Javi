@@ -21,16 +21,20 @@ jobs:
         with:
           gradle-version: "8.11.1"
       - name: Compilar
-        run: gradle :app:assembleDebug --no-daemon --stacktrace
+        run: gradle :app:assembleBaseDebug :app:assembleIconosDebug --no-daemon --stacktrace
       - name: Preparar APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk Javi.apk
+        run: |
+          cp app/build/outputs/apk/base/debug/app-base-debug.apk Javi.apk
+          cp app/build/outputs/apk/iconos/debug/app-iconos-debug.apk Javi-con-iconos.apk
       - uses: actions/upload-artifact@v4
         with:
           name: Javi
-          path: Javi.apk
+          path: |
+            Javi.apk
+            Javi-con-iconos.apk
       - name: Publicar en Releases
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release delete ultima --yes --cleanup-tag || true
-          gh release create ultima Javi.apk --title "Javi (última versión)" --notes "Compilación ${{ github.run_number }} · ${{ github.sha }}. Bajá Javi.apk desde el celular e instalalo."
+          gh release create ultima Javi.apk Javi-con-iconos.apk --title "Javi (última versión)" --notes "Compilación ${{ github.run_number }} · ${{ github.sha }}. Javi.apk es la versión normal. Javi-con-iconos.apk suma el permiso de accesibilidad y Play Protect suele bloquearla."
