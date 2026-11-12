@@ -15,7 +15,7 @@ import kotlin.random.Random
  */
 class Javi {
 
-    enum class St { WALK, SIT, GROOM, STRETCH, SLEEP, PURR, POUNCE, EAT, HELD, FALL }
+    enum class St { WALK, CHASE, SIT, GROOM, STRETCH, SLEEP, PURR, POUNCE, EAT, HELD, FALL }
 
     companion object {
         const val HALF_W = 98f
@@ -62,6 +62,9 @@ class Javi {
     var alt = 0f
     var night = false
 
+    /** Qué está comiendo o tomando (ver Props). */
+    var food = 0
+
     var st = St.WALK
         private set
 
@@ -81,6 +84,8 @@ class Javi {
     private var wCrouch = 0f
     private var wPurr = 0f
     private var wEat = 0f
+    private var wRun = 0f
+    private var gait = 0f
 
     // Pose calculada para el frame actual
     var bl1 = 0f; private set
@@ -125,13 +130,14 @@ class Javi {
         val r = Random.nextFloat()
         dur = when (n) {
             St.WALK -> 5f + r * 5f
+            St.CHASE -> 4f
             St.SIT -> 5f + r * 6f
             St.GROOM -> 5f + r * 3f
             St.STRETCH -> 3f
             St.SLEEP -> 15f + r * 20f
             St.PURR -> 4.5f
             St.POUNCE -> 1.5f
-            St.EAT -> 6f
+            St.EAT -> 6.5f
             St.HELD, St.FALL -> 99999f
         }
     }
@@ -140,7 +146,11 @@ class Javi {
         get() = st == St.HELD || st == St.FALL
 
     fun pet() { if (!busy) set(St.PURR) }
-    fun feed() { if (!busy) set(St.EAT) }
+    fun feed(kind: Int) {
+        if (busy) return
+        food = kind
+        set(St.EAT)
+    }
     fun play() { if (!busy) set(St.POUNCE) }
 
     fun goTo(gx: Float) {
@@ -150,6 +160,17 @@ class Javi {
         dur = 99f
         dir = if (goal >= x) 1f else -1f
     }
+
+    /** Corre hacia tx (el ovillo) y salta cuando está cerca. */
+    fun chase(tx: Float) {
+        if (busy || st == St.POUNCE || st == St.PURR || st == St.EAT) return
+        if (st != St.CHASE) set(St.CHASE)
+        goal = tx.coerceIn(x0, x1)
+    }
+
+    /** true mientras está en el aire durante un salto. */
+    var leaping = false
+        private set
 
     fun hold() { if (st != St.HELD) set(St.HELD) }
 
@@ -190,7 +211,17 @@ class Javi {
                 set(St.SIT)
             }
         } else if (st != St.HELD && now - t0 > dur) {
-            next()
+            if (st == St.EAT) set(St.PURR) else next()
+        }
+
+        if (st == St.CHASE && !goal.isNaN()) {
+            val d = goal - x
+            dir = if (d >= 0f) 1f else -1f
+            if (abs(d) < 70f) {
+                set(St.POUNCE)
+            } else {
+                x = (x + dir * 95f * dt).coerceIn(x0, x1)
+            }
         }
 
         val t = now - t0
@@ -198,7 +229,7 @@ class Javi {
         var crouch = false
         var u = 0f
         val target: FloatArray = when (st) {
-            St.WALK -> P_WALK
+            St.WALK, St.CHASE -> P_WALK
             St.SIT -> P_SIT
             St.GROOM -> P_GROOM
             St.STRETCH -> P_STRETCH
@@ -225,7 +256,9 @@ class Javi {
         s[EYE] += (et - s[EYE]) * (1f - exp(-dt * 28f))
 
         val wf = 1f - exp(-dt * 8f)
-        wWalk = toward(wWalk, st == St.WALK, wf)
+        leaping = leap
+        wWalk = toward(wWalk, st == St.WALK || st == St.CHASE, wf)
+        wRun = toward(wRun, st == St.CHASE, wf)
         wGroom = toward(wGroom, st == St.GROOM, wf)
         wSleep = toward(wSleep, st == St.SLEEP, wf)
         wCrouch = toward(wCrouch, crouch, wf)
@@ -250,7 +283,8 @@ class Javi {
             alt += (0f - alt) * f
         }
 
-        val p = now * 8f
+        gait += dt * (8f + 7f * wRun)
+        val p = gait
         val sw = sin(p) * 26f * wWalk
         val g = sin(now * 7f) * wGroom
         bl1 = s[BL1] + sw

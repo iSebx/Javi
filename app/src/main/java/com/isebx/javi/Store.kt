@@ -21,4 +21,15 @@ object Store {
     fun addComida(c: Context) {
         prefs(c).edit().putInt(COMIDAS, comidas(c) + 1).apply()
     }
+
+    const val SIZE_MIN = 0.35f
+    const val SIZE_MAX = 0.95f
+    const val SIZE_STEP = 0.07f
+
+    /** Tamaño de Javi en pantalla (multiplicador de la densidad). */
+    fun size(c: Context): Float = prefs(c).getFloat("size", 0.55f)
+
+    fun setSize(c: Context, v: Float) {
+        prefs(c).edit().putFloat("size", v.coerceIn(SIZE_MIN, SIZE_MAX)).apply()
+    }
 }

@@ -179,16 +179,13 @@ class JaviPainter {
         // Pata trasera cercana
         leg(c, -14f, -30f + j.py, j.bl1, j.ls, fur, cream)
 
-        // Platito de comida
+        // Comida o bebida servida delante suyo
         if (j.bowlA > 0.02f) {
             val a = (j.bowlA.coerceIn(0f, 1f) * 255).toInt()
-            fill.color = 0xFF8A5A3C.toInt()
-            fill.alpha = a
-            c.drawOval(54f, -13f, 80f, -5f, fill)
-            fill.color = 0xFFD9866F.toInt()
-            fill.alpha = a
-            c.drawRoundRect(50f, -9f, 84f, 2f, 5f, 5f, fill)
-            fill.alpha = 255
+            c.saveLayerAlpha(44f, -30f, 90f, 12f, a)
+            c.translate(67f, -4f)
+            Props.drawServing(c, j.food)
+            c.restore()
         }
         c.restore()
 

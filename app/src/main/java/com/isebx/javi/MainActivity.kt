@@ -3,6 +3,7 @@ package com.isebx.javi
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Typeface
@@ -71,7 +72,7 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER
         })
         root.addView(TextView(this).apply {
-            text = "Tocalo para mimarlo. Tocá el piso y va hacia ahí."
+            text = "Tocalo para mimarlo. En la pantalla, mantenelo apretado para ver sus acciones."
             textSize = 15f
             setTextColor(brown)
             gravity = Gravity.CENTER
@@ -115,16 +116,18 @@ class MainActivity : Activity() {
         }
         fun small(label: String, action: () -> Unit): Button = Button(this).apply {
             text = label
+            textSize = 13f
             setAllCaps(false)
             setOnClickListener { action() }
         }
         fun weight() = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         row.addView(small("Comida") {
-            javi.feed()
-            Store.addComida(this)
-            send(PetService.ACTION_FEED)
-            refresh()
+            AlertDialog.Builder(this)
+                .setTitle("¿Qué le damos?")
+                .setItems(Props.FOOD_NAMES) { _, i -> feed(i) }
+                .show()
         }, weight())
+        row.addView(small("Agua") { feed(Props.AGUA) }, weight())
         row.addView(small("Mimos") {
             javi.pet()
             Store.addMimo(this)
@@ -173,10 +176,20 @@ class MainActivity : Activity() {
         info.text = "Mimos: ${Store.mimos(this)}   ·   Comidas: ${Store.comidas(this)}"
     }
 
-    private fun send(action: String) {
+    private fun send(action: String, kind: Int = -1) {
         if (PetService.running) {
-            startService(Intent(this, PetService::class.java).setAction(action))
+            startService(
+                Intent(this, PetService::class.java).setAction(action)
+                    .putExtra(PetService.EXTRA_KIND, kind)
+            )
         }
+    }
+
+    private fun feed(kind: Int) {
+        javi.feed(kind)
+        if (kind != Props.AGUA) Store.addComida(this)
+        send(PetService.ACTION_FEED, kind)
+        refresh()
     }
 
     private fun onToggle() {
