@@ -1,0 +1,211 @@
+package com.isebx.javi
+
+import android.Manifest
+import android.annotation.SuppressLint
+import android.app.Activity
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.graphics.Typeface
+import android.net.Uri
+import android.os.Build
+import android.os.Bundle
+import android.provider.Settings
+import android.view.Choreographer
+import android.view.Gravity
+import android.view.MotionEvent
+import android.view.View
+import android.widget.Button
+import android.widget.LinearLayout
+import android.widget.TextView
+import android.widget.Toast
+import kotlin.math.abs
+import kotlin.math.min
+
+/** La "casita" de Javi: vista previa, cuidados y el botón para sacarlo a la pantalla. */
+class MainActivity : Activity() {
+
+    private val javi = Javi()
+    private lateinit var preview: PetView
+    private lateinit var toggle: Button
+    private lateinit var info: TextView
+    private var lastNs = 0L
+    private var looping = false
+
+    private val frame = object : Choreographer.FrameCallback {
+        override fun doFrame(ns: Long) {
+            if (!looping) return
+            val dt = if (lastNs == 0L) 0.016f else min(0.05f, (ns - lastNs) / 1e9f)
+            lastNs = ns
+            javi.update(dt)
+            preview.invalidate()
+            Choreographer.getInstance().postFrameCallback(this)
+        }
+    }
+
+    private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
+
+    @SuppressLint("ClickableViewAccessibility", "SetTextI18n")
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        val brown = 0xFF5A4332.toInt()
+        val bg = 0xFFFBF3E7.toInt()
+        window.statusBarColor = bg
+        window.navigationBarColor = bg
+        @Suppress("DEPRECATION")
+        window.decorView.systemUiVisibility =
+            View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(bg)
+            setPadding(dp(24), dp(24), dp(24), dp(24))
+            gravity = Gravity.CENTER_HORIZONTAL
+            fitsSystemWindows = true
+        }
+
+        root.addView(TextView(this).apply {
+            text = "Javi"
+            textSize = 34f
+            setTextColor(brown)
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            gravity = Gravity.CENTER
+        })
+        root.addView(TextView(this).apply {
+            text = "Tocalo para mimarlo. Tocá el piso y va hacia ahí."
+            textSize = 15f
+            setTextColor(brown)
+            gravity = Gravity.CENTER
+            setPadding(0, dp(4), 0, dp(8))
+        })
+
+        val unit = resources.displayMetrics.density * 1.05f
+        preview = PetView(this, javi, unit, false)
+        root.addView(
+            preview,
+            LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f)
+        )
+        preview.addOnLayoutChangeListener { _, l, _, r, _, _, _, _, _ ->
+            javi.setBounds(Javi.HALF_W, (r - l) / unit - Javi.HALF_W)
+        }
+        preview.setOnTouchListener { _, e ->
+            if (e.actionMasked == MotionEvent.ACTION_UP) {
+                val gx = e.x / unit
+                if (abs(gx - javi.x) < 45f) {
+                    javi.pet()
+                    Store.addMimo(this)
+                    refresh()
+                } else {
+                    javi.goTo(gx)
+                }
+            }
+            true
+        }
+
+        info = TextView(this).apply {
+            textSize = 15f
+            setTextColor(brown)
+            gravity = Gravity.CENTER
+            setPadding(0, dp(8), 0, dp(12))
+        }
+        root.addView(info)
+
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+        }
+        fun small(label: String, action: () -> Unit): Button = Button(this).apply {
+            text = label
+            setAllCaps(false)
+            setOnClickListener { action() }
+        }
+        fun weight() = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        row.addView(small("Comida") {
+            javi.feed()
+            Store.addComida(this)
+            send(PetService.ACTION_FEED)
+            refresh()
+        }, weight())
+        row.addView(small("Mimos") {
+            javi.pet()
+            Store.addMimo(this)
+            send(PetService.ACTION_PET)
+            refresh()
+        }, weight())
+        row.addView(small("Jugar") {
+            javi.play()
+            send(PetService.ACTION_PLAY)
+        }, weight())
+        root.addView(row)
+
+        toggle = Button(this).apply {
+            setAllCaps(false)
+            textSize = 17f
+            setOnClickListener { onToggle() }
+        }
+        root.addView(
+            toggle,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = dp(12) }
+        )
+
+        setContentView(root)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        refresh()
+        looping = true
+        lastNs = 0L
+        Choreographer.getInstance().postFrameCallback(frame)
+    }
+
+    override fun onPause() {
+        looping = false
+        Choreographer.getInstance().removeFrameCallback(frame)
+        super.onPause()
+    }
+
+    @SuppressLint("SetTextI18n")
+    private fun refresh() {
+        toggle.text = if (PetService.running) "Guardar a Javi" else "Sacar a Javi a la pantalla"
+        info.text = "Mimos: ${Store.mimos(this)}   ·   Comidas: ${Store.comidas(this)}"
+    }
+
+    private fun send(action: String) {
+        if (PetService.running) {
+            startService(Intent(this, PetService::class.java).setAction(action))
+        }
+    }
+
+    private fun onToggle() {
+        if (PetService.running) {
+            stopService(Intent(this, PetService::class.java))
+            toggle.postDelayed({ refresh() }, 300)
+            return
+        }
+        if (!Settings.canDrawOverlays(this)) {
+            Toast.makeText(
+                this,
+                "Activá el permiso para que Javi pueda caminar sobre la pantalla",
+                Toast.LENGTH_LONG
+            ).show()
+            startActivity(
+                Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:$packageName")
+                )
+            )
+            return
+        }
+        if (Build.VERSION.SDK_INT >= 33 &&
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 7)
+        }
+        startForegroundService(Intent(this, PetService::class.java))
+        toggle.postDelayed({ refresh() }, 400)
+    }
+}

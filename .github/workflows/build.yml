@@ -1,0 +1,36 @@
+name: Compilar APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.11.1"
+      - name: Compilar
+        run: gradle :app:assembleDebug --no-daemon --stacktrace
+      - name: Preparar APK
+        run: cp app/build/outputs/apk/debug/app-debug.apk Javi.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Javi
+          path: Javi.apk
+      - name: Publicar en Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete ultima --yes --cleanup-tag || true
+          gh release create ultima Javi.apk --title "Javi (última versión)" --notes "Compilación ${{ github.run_number }} · ${{ github.sha }}. Bajá Javi.apk desde el celular e instalalo."
