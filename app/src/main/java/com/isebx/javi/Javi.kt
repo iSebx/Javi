@@ -17,7 +17,7 @@ class Javi {
 
     enum class St {
         WALK, CHASE, SIT, GROOM, STRETCH, SLEEP, PURR, POUNCE, EAT, BEG, RUB,
-        HELD, FALL, JUMPTO, PERCH, HANG
+        HELD, FALL, JUMPTO, PERCH, HANG, SLIDE, CLING
     }
 
     companion object {
@@ -62,6 +62,7 @@ class Javi {
         private val P_HELD = floatArrayOf(22f, 30f, -16f, -24f, -24f, 0f, 8f, 28f, -80f, -62f, 3f, 1f, 1f, 1f, 1f, 0f)
         private val P_BEG = floatArrayOf(-85f, -85f, -20f, 49f, -55f, 21f, -16f, 9f, -87f, -20f, 16f, 1.0f, 1.31f, 1f, 1.15f, 0f)
         private val P_RUB = floatArrayOf(0f, 0f, 0f, 0f, -4f, 0f, 20f, 36f, -70f, 78f, 3f, 1f, 1f, 1f, 0.08f, 0f)
+        private val P_CLING = floatArrayOf(50f, 40f, -55f, -45f, 0f, 12f, 6f, 34f, -60f, 85f, 0f, 1f, 1f, 0.8f, 1.25f, 0f)
         private val P_HANG = floatArrayOf(8f, -6f, -100f, -104f, -80f, 0f, -14f, 14f, -74f, -70f, 22f, 1.5f, 1.87f, 1f, 1f, 0f)
     }
 
@@ -94,6 +95,10 @@ class Javi {
     private var jumpA1 = 0f
     private var jumpHang = false
     private var queuedFood = -1
+    private var leaveQueued = false
+    private var leaving = false
+    private var slip = false
+    private var slideV = 0f
     private var loveT = 0f
 
     private var wWalk = 0f
@@ -106,6 +111,8 @@ class Javi {
     private var wRun = 0f
     private var wRub = 0f
     private var wHang = 0f
+    private var wCling = 0f
+    private var wSlide = 0f
     private var gait = 0f
 
     // Pose calculada para el frame actual
@@ -124,6 +131,9 @@ class Javi {
     var eye = 1f; private set
     var tongue = 0f; private set
     var sway = 0f; private set
+    var jitter = 0f; private set
+    var claws = 0f; private set
+    var trail = 0f; private set
     val tailX = FloatArray(TAIL_N + 1)
     val tailY = FloatArray(TAIL_N + 1)
     val heartX = FloatArray(2)
@@ -145,7 +155,8 @@ class Javi {
 
     /** En manos del usuario o en pleno vuelo: no acepta órdenes. */
     private val busy: Boolean
-        get() = st == St.HELD || st == St.FALL || st == St.JUMPTO
+        get() = st == St.HELD || st == St.FALL || st == St.JUMPTO ||
+            st == St.SLIDE || st == St.CLING
 
     /** Subido a un ícono (sentado o colgado). */
     val perched: Boolean
@@ -157,7 +168,12 @@ class Javi {
 
     /** Libre para que se le ocurra hacer algo nuevo. */
     val idle: Boolean
-        get() = st == St.WALK || st == St.SIT || st == St.GROOM || st == St.STRETCH
+        get() = !leaving &&
+            (st == St.WALK || st == St.SIT || st == St.GROOM || st == St.STRETCH)
+
+    /** Ya salió caminando de la pantalla (volvió a su casa). */
+    val gone: Boolean
+        get() = leaving && (x < x0 - HALF_W * 2.2f || x > x1 + HALF_W * 2.2f)
 
     fun setBounds(a: Float, b: Float) {
         x0 = a
@@ -169,6 +185,7 @@ class Javi {
         st = n
         t0 = now
         goal = Float.NaN
+        leaving = false
         val r = Random.nextFloat()
         dur = when (n) {
             St.WALK -> 5f + r * 5f
@@ -185,7 +202,8 @@ class Javi {
             St.PERCH -> 7f + r * 6f
             St.HANG -> 6f + r * 5f
             St.JUMPTO -> 1f
-            St.HELD, St.FALL -> 99999f
+            St.CLING -> 1.3f
+            St.HELD, St.FALL, St.SLIDE -> 99999f
         }
     }
 
@@ -257,6 +275,7 @@ class Javi {
         jumpX1 = tx.coerceIn(x0, x1)
         jumpA1 = max(0f, talt)
         jumpHang = hang
+        slip = false
         dir = if (jumpX1 >= x) 1f else -1f
         set(St.JUMPTO)
         val dist = abs(jumpX1 - jumpX0) + abs(jumpA1 - jumpA0)
@@ -265,10 +284,58 @@ class Javi {
 
     fun hold() { if (st != St.HELD) set(St.HELD) }
 
-    /** Lo soltaron en lo alto: se agarra de donde está y queda colgado. */
-    fun grab() {
-        vy = 0f
+    /** Lo soltaron sobre un ícono: queda colgado de ahí. */
+    fun grabAt(tx: Float, talt: Float) {
+        x = tx.coerceIn(x0, x1)
+        alt = max(0f, talt)
+        slip = false
         set(St.HANG)
+    }
+
+    /** Lo soltaron en lo alto sin nada de donde agarrarse: aguanta un toque y resbala. */
+    fun grabAndSlip() {
+        slip = true
+        set(St.HANG)
+        dur = 1.4f
+    }
+
+    /** Sacudieron el teléfono: se agarra con las uñas hasta que pare. */
+    fun cling() {
+        if (st == St.HELD) return
+        if (st != St.CLING) set(St.CLING)
+        t0 = now
+    }
+
+    /** Vuelve a su casa: camina hasta salir de la pantalla. */
+    fun leave() {
+        if (st == St.HELD) return
+        if (aloft) {
+            leaveQueued = true
+            if (perched) drop()
+            return
+        }
+        startLeave()
+    }
+
+    private fun startLeave() {
+        set(St.WALK)
+        leaving = true
+        dur = 99999f
+        dir = if (x > (x0 + x1) / 2f) 1f else -1f
+    }
+
+    private fun land() {
+        alt = 0f
+        if (leaveQueued) {
+            leaveQueued = false
+            startLeave()
+        } else if (queuedFood >= 0) {
+            food = queuedFood
+            queuedFood = -1
+            set(St.EAT)
+        } else {
+            set(St.SIT)
+        }
     }
 
     fun drop() {
@@ -277,8 +344,17 @@ class Javi {
     }
 
     private fun next() {
+        if (st == St.HANG && slip) {
+            slideV = 40f
+            set(St.SLIDE)
+            return
+        }
         if (perched) {
             drop()
+            return
+        }
+        if (st == St.CLING) {
+            if (alt > 5f) drop() else land()
             return
         }
         if (st == St.EAT || st == St.RUB) {
@@ -312,16 +388,11 @@ class Javi {
         if (st == St.FALL) {
             vy += 1400f * dt
             alt -= vy * dt
-            if (alt <= 0f) {
-                alt = 0f
-                if (queuedFood >= 0) {
-                    food = queuedFood
-                    queuedFood = -1
-                    set(St.EAT)
-                } else {
-                    set(St.SIT)
-                }
-            }
+            if (alt <= 0f) land()
+        } else if (st == St.SLIDE) {
+            slideV = (slideV + 260f * dt).coerceAtMost(420f)
+            alt -= slideV * dt
+            if (alt <= 0f) land()
         } else if (st == St.JUMPTO) {
             val u = ((now - t0) / dur).coerceIn(0f, 1f)
             x = jumpX0 + (jumpX1 - jumpX0) * u
@@ -359,7 +430,8 @@ class Javi {
             St.EAT -> P_EAT
             St.BEG -> P_BEG
             St.RUB -> P_RUB
-            St.HANG -> P_HANG
+            St.HANG, St.SLIDE -> P_HANG
+            St.CLING -> P_CLING
             St.JUMPTO -> P_LEAP
             St.HELD, St.FALL -> P_HELD
             St.POUNCE -> when {
@@ -384,7 +456,7 @@ class Javi {
         val wf = 1f - exp(-dt * 8f)
         leaping = leap
         wWalk = toward(wWalk, st == St.WALK || st == St.CHASE, wf)
-        wRun = toward(wRun, st == St.CHASE, wf)
+        wRun = toward(wRun, st == St.CHASE || leaving, wf)
         wGroom = toward(wGroom, st == St.GROOM, wf)
         wSleep = toward(wSleep, st == St.SLEEP, wf)
         wCrouch = toward(wCrouch, crouch, wf)
@@ -393,12 +465,16 @@ class Javi {
         wEat = toward(wEat, st == St.EAT, wf)
         wRub = toward(wRub, st == St.RUB, wf)
         wHang = toward(wHang, st == St.HANG, wf)
+        wCling = toward(wCling, st == St.CLING, 1f - exp(-dt * 20f))
+        wSlide = toward(wSlide, st == St.SLIDE, wf)
 
         if (st == St.WALK) {
             if (!goal.isNaN()) {
                 if (abs(goal - x) < 3f) set(afterGoal) else dir = if (goal > x) 1f else -1f
             }
-            if (st == St.WALK) {
+            if (st == St.WALK && leaving) {
+                x += dir * 75f * dt
+            } else if (st == St.WALK) {
                 x += dir * SPEED * dt
                 if (x > x1) { x = x1; dir = -1f }
                 if (x < x0) { x = x0; dir = 1f }
@@ -433,7 +509,10 @@ class Javi {
         ls = s[LS]
         eye = s[EYE]
         tongue = s[TG]
-        sway = sin(now * 2.2f) * 6f * wHang
+        sway = sin(now * 2.2f) * 6f * wHang * (1f - wSlide)
+        jitter = sin(now * 62f) * 1.6f * wCling + sin(now * 45f) * 0.8f * wSlide
+        claws = max(wCling, wSlide)
+        trail = wSlide
 
         // Cola: cadena de segmentos que sale de la cadera y se apoya en el piso
         val r = torso * PI.toFloat() / 180f
@@ -442,7 +521,7 @@ class Javi {
         var px = -20f + (-13f) * c - (-13f) * sn
         var pyy = -34f + (-13f) * sn + (-13f) * c + py
         val gy = -5.5f + alt
-        val amp = 14f * (1f - 0.7f * wSleep) + 10f * wCrouch + 8f * wRub
+        val amp = 14f * (1f - 0.7f * wSleep) + 10f * wCrouch + 8f * wRub - 10f * wCling
         val sp = 2.4f + 10f * wCrouch + 6f * wRub
         tailX[0] = px
         tailY[0] = pyy

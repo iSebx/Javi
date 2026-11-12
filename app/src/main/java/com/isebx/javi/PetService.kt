@@ -16,6 +16,10 @@ import android.graphics.PixelFormat
 import android.graphics.Point
 import android.graphics.Rect
 import android.graphics.drawable.Icon
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -33,6 +37,7 @@ import java.util.Calendar
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.sqrt
 import kotlin.random.Random
 
 /** Mantiene a Javi caminando sobre la pantalla, por encima de las demás apps. */
@@ -96,6 +101,10 @@ class PetService : Service() {
             stepYarn(dt)
             stepIcons(dt)
             javi.update(dt)
+            if (javi.gone) {
+                stopSelf()
+                return
+            }
             place()
             view?.invalidate()
             if (javi.calm && !yarn.active) {
@@ -106,11 +115,30 @@ class PetService : Service() {
         }
     }
 
+    private var sensors: SensorManager? = null
+    private var accel: Sensor? = null
+
+    /** Si sacuden el teléfono, Javi se agarra con las uñas. */
+    private val shake = object : SensorEventListener {
+        override fun onSensorChanged(e: SensorEvent) {
+            val ax = e.values[0]
+            val ay = e.values[1]
+            val az = e.values[2]
+            val g = sqrt(ax * ax + ay * ay + az * az) / SensorManager.GRAVITY_EARTH
+            if (g > 2.2f && view != null) javi.cling()
+        }
+
+        override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
+            // no hace falta
+        }
+    }
+
     private val screenReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             when (intent?.action) {
                 Intent.ACTION_SCREEN_OFF -> {
                     active = false
+                    sensors?.unregisterListener(shake)
                     closeMenu()
                 }
                 Intent.ACTION_SCREEN_ON -> resumeLoop()
@@ -129,6 +157,8 @@ class PetService : Service() {
             return
         }
         unit = resources.displayMetrics.density * Store.size(this)
+        sensors = getSystemService(Context.SENSOR_SERVICE) as? SensorManager
+        accel = sensors?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
         measure()
         javi.x = (screenW / unit) * 0.5f
         addWindow()
@@ -172,6 +202,7 @@ class PetService : Service() {
         instance = null
         active = false
         handler.removeCallbacksAndMessages(null)
+        sensors?.unregisterListener(shake)
         Choreographer.getInstance().removeFrameCallback(frame)
         try {
             unregisterReceiver(screenReceiver)
@@ -196,6 +227,8 @@ class PetService : Service() {
 
     private fun resumeLoop() {
         active = true
+        sensors?.unregisterListener(shake)
+        accel?.let { sensors?.registerListener(shake, it, SensorManager.SENSOR_DELAY_UI) }
         lastNs = 0L
         Choreographer.getInstance().removeFrameCallback(frame)
         Choreographer.getInstance().postFrameCallback(frame)
@@ -302,7 +335,7 @@ class PetService : Service() {
                     handler.removeCallbacks(longPress)
                     if (dragging) {
                         // Si lo sueltan en lo alto (sobre un ícono), se queda colgado un rato.
-                        if (javi.alt > 70f) javi.grab() else javi.drop()
+                        if (javi.alt > 70f) release(e.rawX, e.rawY) else javi.drop()
                     } else if (rubbing) {
                         rubbing = false
                     } else if (!longFired && e.actionMasked == MotionEvent.ACTION_UP) {
@@ -391,6 +424,30 @@ class PetService : Service() {
         } else {
             javi.jumpTo(tx, grip, false)
         }
+    }
+
+    /**
+     * Lo soltaron en lo alto. Si Javi ve los íconos y el dedo quedó sobre uno,
+     * se cuelga de ahí; si no hay de dónde agarrarse, aguanta un instante y
+     * resbala con las uñas hasta el piso.
+     */
+    private fun release(px: Float, py: Float) {
+        if (JaviEyes.connected) {
+            val pad = (10f * unit).toInt()
+            for (r in JaviEyes.icons) {
+                if (px >= r.left - pad && px <= r.right + pad &&
+                    py >= r.top - pad && py <= r.bottom + pad
+                ) {
+                    val grip = (floorY - (r.top + r.height() * 0.05f)) / unit
+                    if (grip - Javi.HANG_LEN > 10f) {
+                        perchRect = r
+                        javi.grabAt(r.exactCenterX() / unit, grip - Javi.HANG_LEN)
+                        return
+                    }
+                }
+            }
+        }
+        javi.grabAndSlip()
     }
 
     /** JaviEyes avisa que tocaron algo en la pantalla (coordenadas en píxeles). */
@@ -577,8 +634,8 @@ class PetService : Service() {
         val w = wheel ?: return
         when (level) {
             MENU_MAIN -> w.show(
-                intArrayOf(Props.POLLO, Props.AGUA, Props.YARN, Props.SIZE),
-                arrayOf("Comer", "Agua", "Jugar", "Tamaño")
+                intArrayOf(Props.POLLO, Props.AGUA, Props.YARN, Props.SIZE, Props.HOME),
+                arrayOf("Comer", "Agua", "Jugar", "Tamaño", "A casa")
             )
             MENU_FOOD -> w.show(
                 intArrayOf(Props.POLLO, Props.CARNE, Props.PESCADO, Props.LECHE, Props.ZAPALLO),
@@ -604,6 +661,11 @@ class PetService : Service() {
                     throwYarn()
                 }
                 3 -> showLevel(MENU_SIZE)
+                4 -> {
+                    closeMenu()
+                    yarn.active = false
+                    javi.leave()
+                }
             }
             MENU_FOOD -> {
                 closeMenu()

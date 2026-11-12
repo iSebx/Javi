@@ -17,6 +17,7 @@ object Props {
     const val MINUS = 8
     const val PLUS = 9
     const val OK = 10
+    const val HOME = 11
 
     val FOOD_NAMES = arrayOf("Pollo", "Carnecita", "Pescado", "Leche", "Zapallo")
 
@@ -105,6 +106,14 @@ object Props {
             PLUS -> {
                 c.drawLine(-8f, 0f, 8f, 0f, s(BROWN, 3f))
                 c.drawLine(0f, -8f, 0f, 8f, s(BROWN, 3f))
+            }
+            HOME -> {
+                path.rewind()
+                path.moveTo(-12f, -1f); path.lineTo(0f, -12f); path.lineTo(12f, -1f); path.close()
+                c.drawPath(path, f(0xFFD9866F.toInt()))
+                c.drawRect(-8f, -1f, 8f, 10f, f(0xFFF4E3C8.toInt()))
+                c.drawRect(-8f, -1f, 8f, 10f, s(BROWN, 1.2f))
+                c.drawRect(-2.5f, 3f, 2.5f, 10f, f(BROWN))
             }
             OK -> {
                 path.rewind()

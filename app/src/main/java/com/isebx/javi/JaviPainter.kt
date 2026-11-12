@@ -68,11 +68,33 @@ class JaviPainter {
         close()
     }
 
-    private fun leg(c: Canvas, x: Float, y: Float, rot: Float, sy: Float, main: Int, sock: Int) {
+    private var claws = 0f
+    private var trail = 0f
+
+    private fun leg(
+        c: Canvas, x: Float, y: Float, rot: Float, sy: Float, main: Int, sock: Int,
+        front: Boolean = false
+    ) {
         c.save()
         c.translate(x, y)
         c.rotate(rot)
         c.scale(1f, sy)
+        if (front && trail > 0.05f) {
+            // Marcas de las uñas mientras resbala
+            stroke.strokeWidth = 1.3f
+            stroke.color = 0xFFFFFFFF.toInt()
+            stroke.alpha = (trail * 190).toInt()
+            val len = 20f * trail / sy
+            for (k in -1..1) c.drawLine(k * 3.6f, 30f, k * 3.6f, 30f + len, stroke)
+            stroke.alpha = 255
+        }
+        if (claws > 0.05f) {
+            stroke.strokeWidth = 1.5f
+            stroke.color = dark
+            stroke.alpha = (claws.coerceIn(0f, 1f) * 255).toInt()
+            for (k in -1..1) c.drawLine(k * 3.6f, 28f, k * 3.6f, 28f + 5.5f / sy, stroke)
+            stroke.alpha = 255
+        }
         fill.color = main
         c.drawRoundRect(-6.5f, -4f, 6.5f, 30f, 6.5f, 6.5f, fill)
         fill.color = sock
@@ -96,7 +118,10 @@ class JaviPainter {
     }
 
     fun draw(c: Canvas, j: Javi) {
+        claws = j.claws
+        trail = j.trail
         c.save()
+        c.translate(j.jitter, 0f)
         c.scale(j.dir, 1f)
         if (j.sway > 0.01f || j.sway < -0.01f) c.rotate(j.sway, -8f, -Javi.HANG_LEN)
 
@@ -120,7 +145,7 @@ class JaviPainter {
         c.save()
         c.translate(0f, j.py)
         c.rotate(j.torso, -20f, -34f)
-        leg(c, 15f, -30f, j.fl2, j.ls * j.fs2, furFar, creamFar)
+        leg(c, 15f, -30f, j.fl2, j.ls * j.fs2, furFar, creamFar, true)
         fill.color = fur
         c.drawOval(-41f, -78f, 41f, -20f, fill)
         stroke.strokeWidth = 4f
@@ -174,7 +199,7 @@ class JaviPainter {
         c.save()
         c.translate(0f, j.py)
         c.rotate(j.torso, -20f, -34f)
-        leg(c, 26f, -30f, j.fl1, j.ls * j.fs1, fur, cream)
+        leg(c, 26f, -30f, j.fl1, j.ls * j.fs1, fur, cream, true)
         c.restore()
 
         // Pata trasera cercana
