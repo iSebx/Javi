@@ -17,7 +17,7 @@ class Javi {
 
     enum class St {
         WALK, CHASE, SIT, GROOM, STRETCH, SLEEP, PURR, POUNCE, EAT, BEG, RUB,
-        HELD, FALL, JUMPTO, PERCH, HANG, SLIDE, CLING
+        HELD, FALL, JUMPTO, PERCH, HANG, SLIDE, CLING, BATH, SHAKE
     }
 
     companion object {
@@ -62,6 +62,7 @@ class Javi {
         private val P_HELD = floatArrayOf(22f, 30f, -16f, -24f, -24f, 0f, 8f, 28f, -80f, -62f, 3f, 1f, 1f, 1f, 1f, 0f)
         private val P_BEG = floatArrayOf(-85f, -85f, -20f, 49f, -55f, 21f, -16f, 9f, -87f, -20f, 16f, 1.0f, 1.31f, 1f, 1.15f, 0f)
         private val P_RUB = floatArrayOf(0f, 0f, 0f, 0f, -4f, 0f, 20f, 36f, -70f, 78f, 3f, 1f, 1f, 1f, 0.08f, 0f)
+        private val P_BATH = floatArrayOf(-85f, -85f, 49f, 49f, -55f, 21f, 8f, 9f, -86f, -30f, 15f, 1.48f, 1.31f, 1f, 0.6f, 0f)
         private val P_CLING = floatArrayOf(50f, 40f, -55f, -45f, 0f, 12f, 6f, 34f, -60f, 85f, 0f, 1f, 1f, 0.8f, 1.25f, 0f)
         private val P_HANG = floatArrayOf(8f, -6f, -100f, -104f, -80f, 0f, -14f, 14f, -74f, -70f, 22f, 1.5f, 1.87f, 1f, 1f, 0f)
     }
@@ -74,6 +75,13 @@ class Javi {
 
     /** Qué está comiendo o tomando (ver Props). */
     var food = 0
+
+    /** Qué tan mojado está (0 a 1). Se va secando solo. */
+    var wet = 0f
+
+    /** Reloj interno, para animaciones del dibujo. */
+    val time: Float
+        get() = now
 
     var st = St.WALK
         private set
@@ -113,6 +121,7 @@ class Javi {
     private var wHang = 0f
     private var wCling = 0f
     private var wSlide = 0f
+    private var wShake = 0f
     private var gait = 0f
 
     // Pose calculada para el frame actual
@@ -134,6 +143,7 @@ class Javi {
     var jitter = 0f; private set
     var claws = 0f; private set
     var trail = 0f; private set
+    var shaking = 0f; private set
     val tailX = FloatArray(TAIL_N + 1)
     val tailY = FloatArray(TAIL_N + 1)
     val heartX = FloatArray(2)
@@ -156,7 +166,7 @@ class Javi {
     /** En manos del usuario o en pleno vuelo: no acepta órdenes. */
     private val busy: Boolean
         get() = st == St.HELD || st == St.FALL || st == St.JUMPTO ||
-            st == St.SLIDE || st == St.CLING
+            st == St.SLIDE || st == St.CLING || st == St.BATH
 
     /** Subido a un ícono (sentado o colgado). */
     val perched: Boolean
@@ -203,7 +213,8 @@ class Javi {
             St.HANG -> 6f + r * 5f
             St.JUMPTO -> 1f
             St.CLING -> 1.3f
-            St.HELD, St.FALL, St.SLIDE -> 99999f
+            St.SHAKE -> 1.4f
+            St.HELD, St.FALL, St.SLIDE, St.BATH -> 99999f
         }
     }
 
@@ -299,9 +310,24 @@ class Javi {
         dur = 1.4f
     }
 
+    /** Empieza el baño: se sienta quieto, en el piso. */
+    fun startBath() {
+        alt = 0f
+        dir = 1f
+        leaveQueued = false
+        queuedFood = -1
+        set(St.BATH)
+    }
+
+    /** Termina el baño: se sacude el agua. */
+    fun endBath() {
+        if (st != St.BATH) return
+        set(St.SHAKE)
+    }
+
     /** Sacudieron el teléfono: se agarra con las uñas hasta que pare. */
     fun cling() {
-        if (st == St.HELD) return
+        if (st == St.HELD || st == St.BATH) return
         if (st != St.CLING) set(St.CLING)
         t0 = now
     }
@@ -432,6 +458,8 @@ class Javi {
             St.RUB -> P_RUB
             St.HANG, St.SLIDE -> P_HANG
             St.CLING -> P_CLING
+            St.BATH -> P_BATH
+            St.SHAKE -> P_WALK
             St.JUMPTO -> P_LEAP
             St.HELD, St.FALL -> P_HELD
             St.POUNCE -> when {
@@ -467,6 +495,9 @@ class Javi {
         wHang = toward(wHang, st == St.HANG, wf)
         wCling = toward(wCling, st == St.CLING, 1f - exp(-dt * 20f))
         wSlide = toward(wSlide, st == St.SLIDE, wf)
+        wShake = toward(wShake, st == St.SHAKE, 1f - exp(-dt * 14f))
+        if (st == St.SHAKE) wet = if (wet > 0.45f) max(0.45f, wet - dt * 0.25f) else wet
+        else if (st != St.BATH && wet > 0f) wet = max(0f, wet - dt / 150f)
 
         if (st == St.WALK) {
             if (!goal.isNaN()) {
@@ -499,9 +530,11 @@ class Javi {
         fl1 = s[FL1] - sw + g * 8f
         val bob = -abs(sin(p)) * 1.6f * wWalk + sin(now * 1.8f) * 0.9f * wSleep
         py = s[PY] + bob
-        torso = s[TORSO] + sin(now * 32f) * 2.5f * wCrouch + rb * 3f
+        val shk = sin(now * 38f) * wShake
+        torso = s[TORSO] + sin(now * 32f) * 2.5f * wCrouch + rb * 3f + shk * 5f
         head = s[HEAD] + sin(p * 2f) * 2.5f * wWalk + g * 5f +
-            sin(now * 3f) * 4f * wPurr + sin(now * 9f) * 4f * wEat + rb * 12f
+            sin(now * 3f) * 4f * wPurr + sin(now * 9f) * 4f * wEat + rb * 12f +
+            sin(now * 38f + 1.2f) * 14f * wShake
         headX = s[HX] + rb * 4f
         headY = s[HY] + bob
         fs1 = s[FS1]
@@ -510,7 +543,8 @@ class Javi {
         eye = s[EYE]
         tongue = s[TG]
         sway = sin(now * 2.2f) * 6f * wHang * (1f - wSlide)
-        jitter = sin(now * 62f) * 1.6f * wCling + sin(now * 45f) * 0.8f * wSlide
+        jitter = sin(now * 62f) * 1.6f * wCling + sin(now * 45f) * 0.8f * wSlide + shk * 2.5f
+        shaking = wShake
         claws = max(wCling, wSlide)
         trail = wSlide
 

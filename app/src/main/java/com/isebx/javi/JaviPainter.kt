@@ -10,11 +10,24 @@ import android.graphics.Path
  */
 class JaviPainter {
 
-    private val fur = 0xFFF0C595.toInt()
-    private val furFar = 0xFFE0AE7C.toInt()
-    private val furDark = 0xFFE2B181.toInt()
-    private val cream = 0xFFF9E8D2.toInt()
-    private val creamFar = 0xFFECD6B8.toInt()
+    // Colores del pelaje: se oscurecen cuando está mojado
+    private var fur = 0xFFF0C595.toInt()
+    private var furFar = 0xFFE0AE7C.toInt()
+    private var furDark = 0xFFE2B181.toInt()
+    private var cream = 0xFFF9E8D2.toInt()
+    private var creamFar = 0xFFECD6B8.toInt()
+    private val water = 0xFF9AD4F2.toInt()
+
+    private fun mix(a: Int, b: Int, t: Float): Int {
+        val u = t.coerceIn(0f, 1f)
+        val r = ((a shr 16 and 255) + ((b shr 16 and 255) - (a shr 16 and 255)) * u).toInt()
+        val g = ((a shr 8 and 255) + ((b shr 8 and 255) - (a shr 8 and 255)) * u).toInt()
+        val bl = ((a and 255) + ((b and 255) - (a and 255)) * u).toInt()
+        return (255 shl 24) or (r shl 16) or (g shl 8) or bl
+    }
+
+    private val wetSpotX = floatArrayOf(-22f, 2f, -8f, 20f, 30f, -30f)
+    private val wetSpotY = floatArrayOf(-58f, -40f, -30f, -92f, -70f, -36f)
     private val pink = 0xFFEFB3A8.toInt()
     private val nose = 0xFFE79A94.toInt()
     private val dark = 0xFF3A2418.toInt()
@@ -120,6 +133,12 @@ class JaviPainter {
     fun draw(c: Canvas, j: Javi) {
         claws = j.claws
         trail = j.trail
+        val w = j.wet
+        fur = mix(0xFFF0C595.toInt(), 0xFFD3A06C.toInt(), w)
+        furFar = mix(0xFFE0AE7C.toInt(), 0xFFC08A58.toInt(), w)
+        furDark = mix(0xFFE2B181.toInt(), 0xFFB98455.toInt(), w)
+        cream = mix(0xFFF9E8D2.toInt(), 0xFFE6CDAE.toInt(), w)
+        creamFar = mix(0xFFECD6B8.toInt(), 0xFFD6B994.toInt(), w)
         c.save()
         c.translate(j.jitter, 0f)
         c.scale(j.dir, 1f)
@@ -214,6 +233,37 @@ class JaviPainter {
             c.restore()
         }
         c.restore()
+
+        // Mojado: gotitas que brillan y gotean
+        if (j.wet > 0.12f) {
+            val a = (j.wet.coerceIn(0f, 1f) * 230).toInt()
+            for (i in wetSpotX.indices) {
+                val ph = (j.time * 0.55f + i * 0.37f) % 1f
+                fill.color = water
+                fill.alpha = (a * (1f - ph)).toInt()
+                c.drawOval(
+                    wetSpotX[i] * j.dir - 1.8f, wetSpotY[i] + ph * 22f - 2.6f,
+                    wetSpotX[i] * j.dir + 1.8f, wetSpotY[i] + ph * 22f + 2.6f, fill
+                )
+            }
+            fill.alpha = 255
+        }
+
+        // Se sacude: salpica para todos lados
+        if (j.shaking > 0.05f && j.wet > 0.05f) {
+            for (i in 0..9) {
+                val ph = (j.time * 2.6f + i * 0.17f) % 1f
+                val ang = i * 0.628f + 0.3f
+                val dist = 34f + 62f * ph
+                fill.color = water
+                fill.alpha = ((1f - ph) * j.shaking.coerceIn(0f, 1f) * 240).toInt()
+                c.drawCircle(
+                    (4f * j.dir) + kotlin.math.cos(ang) * dist,
+                    -58f + kotlin.math.sin(ang) * dist * 0.8f, 2.6f, fill
+                )
+            }
+            fill.alpha = 255
+        }
 
         // Corazones
         for (q in 0..1) {

@@ -25,7 +25,7 @@ class WheelView(context: Context, private val d: Float) : View(context) {
     private val px = FloatArray(8)
     private val py = FloatArray(8)
 
-    private val radius = 118f * d
+    private var radius = 118f * d
     private val item = 31f * d
 
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -58,14 +58,20 @@ class WheelView(context: Context, private val d: Float) : View(context) {
     private fun layoutItems() {
         val n = icons.size
         if (n == 0) return
-        val margin = radius * 0.94f + item + 6f * d
+        val wide = n >= 6
+        radius = (if (wide) 126f else 118f) * d
+        val margin = radius + item + 4f * d
         var ccx = cx
         if (width > 0) {
             if (width < margin * 2f) ccx = width / 2f else ccx = ccx.coerceIn(margin, width - margin)
         }
         val ccy = if (cy - radius - item < 30f * d) radius + item + 30f * d else cy
         for (i in 0 until n) {
-            val a = if (n == 1) 270.0 else 200.0 + 140.0 * i / (n - 1)
+            val a = when {
+                n == 1 -> 270.0
+                wide -> 190.0 + 160.0 * i / (n - 1)
+                else -> 200.0 + 140.0 * i / (n - 1)
+            }
             val r = Math.toRadians(a)
             px[i] = ccx + radius * cos(r).toFloat()
             py[i] = ccy + radius * sin(r).toFloat()

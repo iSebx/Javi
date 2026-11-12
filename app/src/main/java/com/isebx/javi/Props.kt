@@ -18,6 +18,9 @@ object Props {
     const val PLUS = 9
     const val OK = 10
     const val HOME = 11
+    const val BRUSH = 12
+    const val SHOWER = 13
+    const val BACK = 14
 
     val FOOD_NAMES = arrayOf("Pollo", "Carnecita", "Pescado", "Leche", "Zapallo")
 
@@ -106,6 +109,33 @@ object Props {
             PLUS -> {
                 c.drawLine(-8f, 0f, 8f, 0f, s(BROWN, 3f))
                 c.drawLine(0f, -8f, 0f, 8f, s(BROWN, 3f))
+            }
+            BRUSH -> {
+                c.drawRoundRect(-12f, -9f, 12f, -2f, 3f, 3f, f(0xFFB9794A.toInt()))
+                for (k in -4..4) c.drawLine(k * 2.6f, -1f, k * 2.6f, 5f, s(0xFFFFF1DC.toInt(), 1.6f))
+                c.drawCircle(-7f, 8f, 3.6f, f(0xFFFFFFFF.toInt()))
+                c.drawCircle(0f, 9.5f, 4.2f, f(0xFFFFFFFF.toInt()))
+                c.drawCircle(7f, 8f, 3.4f, f(0xFFFFFFFF.toInt()))
+                c.drawCircle(-7f, 8f, 3.6f, s(0xFFBFD9F2.toInt(), 0.8f))
+                c.drawCircle(0f, 9.5f, 4.2f, s(0xFFBFD9F2.toInt(), 0.8f))
+                c.drawCircle(7f, 8f, 3.4f, s(0xFFBFD9F2.toInt(), 0.8f))
+            }
+            SHOWER -> {
+                c.drawLine(0f, -12f, 0f, -6f, s(0xFF8C9AA8.toInt(), 3f))
+                path.rewind()
+                path.moveTo(-11f, 0f); path.quadTo(0f, -12f, 11f, 0f); path.close()
+                c.drawPath(path, f(0xFFAEBBC8.toInt()))
+                c.drawRoundRect(-11f, -1f, 11f, 2f, 1.5f, 1.5f, f(0xFF8C9AA8.toInt()))
+                for (k in -2..2) {
+                    c.drawLine(k * 4f, 5f, k * 4.6f, 8.5f, s(0xFF8CCBF2.toInt(), 1.6f))
+                    c.drawLine(k * 4.9f, 10.5f, k * 5.4f, 13f, s(0xFF8CCBF2.toInt(), 1.6f))
+                }
+            }
+            BACK -> {
+                path.rewind()
+                path.moveTo(9f, 0f); path.lineTo(-8f, 0f)
+                path.moveTo(-2f, -6.5f); path.lineTo(-8.5f, 0f); path.lineTo(-2f, 6.5f)
+                c.drawPath(path, s(BROWN, 3f))
             }
             HOME -> {
                 path.rewind()

@@ -75,6 +75,7 @@ class PetService : Service() {
     private var kicked = false
 
     private var wheel: WheelView? = null
+    private var bath: BathView? = null
     private var menuLevel = MENU_MAIN
 
     private var unit = 1f
@@ -100,6 +101,10 @@ class PetService : Service() {
             }
             stepYarn(dt)
             stepIcons(dt)
+            bath?.let {
+                it.step(dt)
+                it.invalidate()
+            }
             javi.update(dt)
             if (javi.gone) {
                 stopSelf()
@@ -125,7 +130,7 @@ class PetService : Service() {
             val ay = e.values[1]
             val az = e.values[2]
             val g = sqrt(ax * ax + ay * ay + az * az) / SensorManager.GRAVITY_EARTH
-            if (g > 2.2f && view != null) javi.cling()
+            if (g > 2.2f && view != null && bath == null) javi.cling()
         }
 
         override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
@@ -139,6 +144,7 @@ class PetService : Service() {
                 Intent.ACTION_SCREEN_OFF -> {
                     active = false
                     sensors?.unregisterListener(shake)
+                    endBath()
                     closeMenu()
                 }
                 Intent.ACTION_SCREEN_ON -> resumeLoop()
@@ -192,6 +198,7 @@ class PetService : Service() {
         super.onConfigurationChanged(newConfig)
         if (view != null) {
             closeMenu()
+            endBath()
             measure()
             place()
         }
@@ -210,6 +217,7 @@ class PetService : Service() {
             // no estaba registrado
         }
         closeMenu()
+        endBath()
         removeYarnWindow()
         removeQuietly(view)
         view = null
@@ -634,8 +642,10 @@ class PetService : Service() {
         val w = wheel ?: return
         when (level) {
             MENU_MAIN -> w.show(
-                intArrayOf(Props.POLLO, Props.AGUA, Props.YARN, Props.SIZE, Props.HOME),
-                arrayOf("Comer", "Agua", "Jugar", "Tamaño", "A casa")
+                intArrayOf(
+                    Props.POLLO, Props.AGUA, Props.YARN, Props.SHOWER, Props.SIZE, Props.HOME
+                ),
+                arrayOf("Comer", "Agua", "Jugar", "Bañar", "Tamaño", "A casa")
             )
             MENU_FOOD -> w.show(
                 intArrayOf(Props.POLLO, Props.CARNE, Props.PESCADO, Props.LECHE, Props.ZAPALLO),
@@ -660,8 +670,12 @@ class PetService : Service() {
                     closeMenu()
                     throwYarn()
                 }
-                3 -> showLevel(MENU_SIZE)
-                4 -> {
+                3 -> {
+                    closeMenu()
+                    startBath()
+                }
+                4 -> showLevel(MENU_SIZE)
+                5 -> {
                     closeMenu()
                     yarn.active = false
                     javi.leave()
@@ -683,6 +697,48 @@ class PetService : Service() {
     private fun closeMenu() {
         removeQuietly(wheel)
         wheel = null
+    }
+
+    // ---------- Baño ----------
+
+    private fun startBath() {
+        if (bath != null) return
+        yarn.active = false
+        perchRect = null
+        javi.startBath()
+        val b = BathView(this, javi, resources.displayMetrics.density)
+        b.onExit = { handler.post { endBath() } }
+        val params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                WindowManager.LayoutParams.FLAG_DIM_BEHIND,
+            PixelFormat.TRANSLUCENT
+        )
+        params.dimAmount = 0.72f
+        params.gravity = Gravity.TOP or Gravity.START
+        if (Build.VERSION.SDK_INT >= 28) {
+            params.layoutInDisplayCutoutMode =
+                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+        }
+        try {
+            wm.addView(b, params)
+            bath = b
+            view?.visibility = View.INVISIBLE
+        } catch (e: Exception) {
+            javi.endBath()
+        }
+    }
+
+    private fun endBath() {
+        val b = bath ?: return
+        bath = null
+        removeQuietly(b)
+        view?.visibility = View.VISIBLE
+        javi.endBath()
     }
 
     // ---------- Notificación ----------
