@@ -164,14 +164,15 @@ class JaviPainter {
         c.save()
         c.translate(0f, j.py)
         c.rotate(j.torso, -20f, -34f)
-        leg(c, 15f, -30f, j.fl2, j.ls * j.fs2, furFar, creamFar, true)
+        val sx = 82f * j.stretch
+        leg(c, 15f + sx * 0.85f, -30f, j.fl2, j.ls * j.fs2, furFar, creamFar, true)
         fill.color = fur
-        c.drawOval(-41f, -78f, 41f, -20f, fill)
+        c.drawOval(-41f, -78f, 41f + sx, -20f, fill)
         stroke.strokeWidth = 4f
         stroke.color = furDark
         c.drawPath(bodyStripes, stroke)
         fill.color = cream
-        c.drawOval(11f, -50f, 37f, -22f, fill)
+        c.drawOval(11f + sx * 0.9f, -50f, 37f + sx * 0.9f, -22f, fill)
         c.restore()
 
         // Cabeza
@@ -218,7 +219,7 @@ class JaviPainter {
         c.save()
         c.translate(0f, j.py)
         c.rotate(j.torso, -20f, -34f)
-        leg(c, 26f, -30f, j.fl1, j.ls * j.fs1, fur, cream, true)
+        leg(c, 26f + 82f * j.stretch * 0.85f, -30f, j.fl1, j.ls * j.fs1, fur, cream, true)
         c.restore()
 
         // Pata trasera cercana

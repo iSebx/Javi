@@ -24,12 +24,15 @@ class Javi {
 
     companion object {
         const val HALF_W = 98f
-        const val TOP = 150f
+        const val TOP = 175f
         const val BOTTOM = 6f
         const val TAIL_N = 8
 
         /** Distancia de las patas traseras a las delanteras cuando cuelga. */
         const val HANG_LEN = 123f
+
+        /** Hasta dónde llegan sus patas cuando se estira contra la pantalla. */
+        const val REACH_LEN = 155f
 
         private const val BL1 = 0
         private const val BL2 = 1
@@ -65,7 +68,7 @@ class Javi {
         private val P_BEG = floatArrayOf(-85f, -85f, -20f, 49f, -55f, 21f, -16f, 9f, -87f, -20f, 16f, 1.0f, 1.31f, 1f, 1.15f, 0f)
         private val P_RUB = floatArrayOf(0f, 0f, 0f, 0f, -4f, 0f, 20f, 36f, -70f, 78f, 3f, 1f, 1f, 1f, 0.08f, 0f)
         private val P_WATCH = floatArrayOf(-85f, -85f, 49f, 49f, -55f, 21f, 0f, 9f, -86f, -30f, 14f, 1.48f, 1.31f, 1f, 1.15f, 0f)
-        private val P_REACH = floatArrayOf(4f, -4f, -100f, -104f, -80f, 0f, 0f, 14f, -74f, -15f, 10f, 1.5f, 1.87f, 1f, 1.15f, 0f)
+        private val P_REACH = floatArrayOf(12f, 4f, -102f, -102f, -74f, 0f, 0f, 24f, -84f, 20f, 4f, 1.9f, 2.25f, 1f, 1.15f, 0f)
         private val P_BATH = floatArrayOf(-85f, -85f, 49f, 49f, -55f, 21f, 8f, 9f, -86f, -30f, 15f, 1.48f, 1.31f, 1f, 0.6f, 0f)
         private val P_CLING = floatArrayOf(50f, 40f, -55f, -45f, 0f, 12f, 6f, 34f, -60f, 85f, 0f, 1f, 1f, 0.8f, 1.25f, 0f)
         private val P_HANG = floatArrayOf(8f, -6f, -100f, -104f, -80f, 0f, -14f, 14f, -74f, -70f, 22f, 1.5f, 1.87f, 1f, 1f, 0f)
@@ -159,6 +162,9 @@ class Javi {
     var claws = 0f; private set
     var trail = 0f; private set
     var shaking = 0f; private set
+
+    /** Cuánto se alarga el cuerpo al estirarse (0 = normal). */
+    var stretch = 0f; private set
     val tailX = FloatArray(TAIL_N + 1)
     val tailY = FloatArray(TAIL_N + 1)
     val heartX = FloatArray(2)
@@ -345,11 +351,11 @@ class Javi {
 
     /** Altura de sus patas delanteras cuando está estirado hacia arriba. */
     val pawAlt: Float
-        get() = alt + HANG_LEN
+        get() = alt + REACH_LEN
 
     /** true si está intentando alcanzar la luciérnaga. */
     val swatting: Boolean
-        get() = st == St.REACH || st == St.CLIMB
+        get() = st == St.REACH
 
     private fun stepAttention(dt: Float) {
         if (climbCool > 0f) climbCool -= dt
@@ -376,18 +382,15 @@ class Javi {
         }
         if (ad > 10f) dir = if (d > 0f) 1f else -1f
         if (st == St.REACH) {
-            if (ad > 85f || flyAlt > 195f || flyAlt < 80f) set(St.WATCH)
+            if (ad > 85f || flyAlt > 330f || flyAlt < 80f) set(St.WATCH)
             return
         }
         // WATCH
         if (ad > 115f) {
             x = (x + dir * SPEED * dt).coerceIn(x0, x1)
         } else if (ad < 60f) {
-            if (flyAlt in 95f..185f) {
-                set(St.REACH)
-            } else if (flyAlt > 185f && flyAlt < climbMax + HANG_LEN && climbCool <= 0f) {
-                set(St.CLIMB)
-            }
+            // Se estira contra la pantalla, con las patas de atrás en el piso. No trepa.
+            if (flyAlt in 95f..300f) set(St.REACH)
         }
     }
 
@@ -618,7 +621,7 @@ class Javi {
         val g = sin(now * 7f) * wGroom
         val rb = sin(now * 5f) * wRub
         val cl = sin(now * 8f) * wClimb
-        val swat = wReach + 0.6f * wClimb
+        val swat = 0.7f * wReach + 0.6f * wClimb
         bl1 = s[BL1] + sw + sin(now * 2.2f) * 7f * wHang - cl * 14f
         fl2 = s[FL2] + sw + sin(now * 9f + 2.2f) * 13f * swat - cl * 8f
         bl2 = s[BL2] - sw - sin(now * 2.2f + 0.6f) * 7f * wHang + cl * 14f
@@ -640,6 +643,7 @@ class Javi {
         sway = sin(now * 2.2f) * 6f * wHang * (1f - wSlide) * (1f - wClimb)
         jitter = sin(now * 62f) * 1.6f * wCling + sin(now * 45f) * 0.8f * wSlide + shk * 2.5f
         shaking = wShake
+        stretch = 0.3f * wReach
         claws = max(max(wCling, wSlide), wClimb)
         trail = wSlide
 

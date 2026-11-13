@@ -26,9 +26,9 @@ class Firefly {
         vx = (if (fromLeft) 1f else -1f) * (38f + Random.nextFloat() * 22f)
         val r = Random.nextFloat()
         baseAlt = when {
-            r < 0.4f -> 120f + Random.nextFloat() * 45f
-            r < 0.8f -> 215f + Random.nextFloat() * 130f
-            else -> 380f + Random.nextFloat() * 120f
+            r < 0.55f -> 125f + Random.nextFloat() * 65f
+            r < 0.85f -> 200f + Random.nextFloat() * 90f
+            else -> 330f + Random.nextFloat() * 150f
         }.coerceAtMost(maxAlt)
         alt = baseAlt
         t = Random.nextFloat() * 10f
