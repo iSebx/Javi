@@ -21,6 +21,7 @@ object Props {
     const val BRUSH = 12
     const val SHOWER = 13
     const val BACK = 14
+    const val FIREFLY = 15
 
     val FOOD_NAMES = arrayOf("Pollo", "Carnecita", "Pescado", "Leche", "Zapallo")
 
@@ -109,6 +110,16 @@ object Props {
             PLUS -> {
                 c.drawLine(-8f, 0f, 8f, 0f, s(BROWN, 3f))
                 c.drawLine(0f, -8f, 0f, 8f, s(BROWN, 3f))
+            }
+            FIREFLY -> {
+                fill.color = 0xFFF6F59A.toInt()
+                fill.alpha = 110
+                c.drawCircle(0f, 2f, 12f, fill)
+                fill.alpha = 255
+                c.drawCircle(0f, 3f, 6f, f(0xFFF2E86B.toInt()))
+                c.drawCircle(0f, -4f, 3.2f, f(0xFF4A3B2A.toInt()))
+                c.drawOval(-11f, -8f, -2f, -2f, f(0xFFDCEBFA.toInt()))
+                c.drawOval(2f, -8f, 11f, -2f, f(0xFFDCEBFA.toInt()))
             }
             BRUSH -> {
                 c.drawRoundRect(-12f, -9f, 12f, -2f, 3f, 3f, f(0xFFB9794A.toInt()))

@@ -60,6 +60,7 @@ class PetService : Service() {
         private const val MENU_MAIN = 0
         private const val MENU_FOOD = 1
         private const val MENU_SIZE = 2
+        private const val MENU_PLAY = 3
     }
 
     private lateinit var wm: WindowManager
@@ -73,6 +74,11 @@ class PetService : Service() {
     private var yarnView: YarnView? = null
     private var yarnLp: WindowManager.LayoutParams? = null
     private var kicked = false
+
+    private val fly = Firefly()
+    private var flyView: FireflyView? = null
+    private var flyLp: WindowManager.LayoutParams? = null
+    private var flyTimer = 25f
 
     private var wheel: WheelView? = null
     private var bath: BathView? = null
@@ -101,6 +107,7 @@ class PetService : Service() {
             }
             stepYarn(dt)
             stepIcons(dt)
+            stepFly(dt)
             bath?.let {
                 it.step(dt)
                 it.invalidate()
@@ -112,7 +119,7 @@ class PetService : Service() {
             }
             place()
             view?.invalidate()
-            if (javi.calm && !yarn.active) {
+            if (javi.calm && !yarn.active && !fly.active) {
                 Choreographer.getInstance().postFrameCallbackDelayed(this, 60)
             } else {
                 Choreographer.getInstance().postFrameCallback(this)
@@ -219,6 +226,7 @@ class PetService : Service() {
         closeMenu()
         endBath()
         removeYarnWindow()
+        removeFlyWindow()
         removeQuietly(view)
         view = null
         super.onDestroy()
@@ -389,6 +397,8 @@ class PetService : Service() {
         if (abs(next - old) < 0.001f) return
         val hadYarn = yarn.active
         removeYarnWindow()
+        fly.active = false
+        removeFlyWindow()
         removeQuietly(view)
         view = null
         javi.x = javi.x * old / next
@@ -651,6 +661,10 @@ class PetService : Service() {
                 intArrayOf(Props.POLLO, Props.CARNE, Props.PESCADO, Props.LECHE, Props.ZAPALLO),
                 Props.FOOD_NAMES
             )
+            MENU_PLAY -> w.show(
+                intArrayOf(Props.YARN, Props.FIREFLY),
+                arrayOf("Ovillo", "Luciérnaga")
+            )
             MENU_SIZE -> w.show(
                 intArrayOf(Props.MINUS, Props.OK, Props.PLUS),
                 arrayOf("Más chico", "Listo", "Más grande")
@@ -666,10 +680,7 @@ class PetService : Service() {
                     closeMenu()
                     javi.feed(Props.AGUA)
                 }
-                2 -> {
-                    closeMenu()
-                    throwYarn()
-                }
+                2 -> showLevel(MENU_PLAY)
                 3 -> {
                     closeMenu()
                     startBath()
@@ -686,6 +697,10 @@ class PetService : Service() {
                 javi.feed(i)
                 Store.addComida(this)
             }
+            MENU_PLAY -> {
+                closeMenu()
+                if (i == 0) throwYarn() else releaseFly()
+            }
             MENU_SIZE -> when (i) {
                 0 -> resize(-Store.SIZE_STEP)
                 1 -> closeMenu()
@@ -697,6 +712,82 @@ class PetService : Service() {
     private fun closeMenu() {
         removeQuietly(wheel)
         wheel = null
+    }
+
+    // ---------- Luciérnaga ----------
+
+    private fun maxClimb(): Float = floorY * 0.8f / unit - Javi.HANG_LEN
+
+    private fun releaseFly() {
+        if (fly.active || bath != null) return
+        val w = screenW / unit
+        fly.spawn(0f, w, floorY * 0.85f / unit)
+        if (flyView == null) addFlyWindow()
+    }
+
+    private fun addFlyWindow() {
+        val v = FireflyView(this, fly, unit)
+        val side = (FireflyView.HALF * 2f * unit).toInt()
+        val params = overlayParams(side, side)
+        // No se toca, y con esta transparencia Android deja pasar los toques a lo de abajo.
+        params.flags = params.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+        params.alpha = 0.8f
+        flyLp = params
+        flyView = v
+        placeFly(params)
+        try {
+            wm.addView(v, params)
+        } catch (e: Exception) {
+            flyView = null
+            flyLp = null
+            fly.active = false
+        }
+    }
+
+    private fun placeFly(params: WindowManager.LayoutParams): Boolean {
+        val nx = ((fly.x - FireflyView.HALF) * unit).toInt()
+        val ny = (floorY - (fly.alt + FireflyView.HALF) * unit).toInt()
+        if (nx == params.x && ny == params.y) return false
+        params.x = nx
+        params.y = ny
+        return true
+    }
+
+    private fun removeFlyWindow() {
+        removeQuietly(flyView)
+        flyView = null
+        flyLp = null
+    }
+
+    /** Cada tanto pasa sola una luciérnaga, más seguido de noche. */
+    private fun stepFly(dt: Float) {
+        if (!fly.active) {
+            if (flyView != null) removeFlyWindow()
+            flyTimer -= dt
+            if (flyTimer <= 0f) {
+                flyTimer = if (javi.night) 45f + Random.nextFloat() * 50f
+                else 80f + Random.nextFloat() * 90f
+                if (javi.idle && !yarn.active && wheel == null && bath == null) releaseFly()
+            }
+            return
+        }
+        fly.update(dt, javi.x, javi.pawAlt, javi.swatting)
+        if (!fly.active || bath != null) {
+            fly.active = false
+            removeFlyWindow()
+            return
+        }
+        if (!yarn.active) javi.attend(fly.x, fly.alt, maxClimb())
+        val v = flyView ?: return
+        val params = flyLp ?: return
+        if (placeFly(params)) {
+            try {
+                wm.updateViewLayout(v, params)
+            } catch (e: Exception) {
+                // la ventana ya no existe
+            }
+        }
+        v.invalidate()
     }
 
     // ---------- Baño ----------
