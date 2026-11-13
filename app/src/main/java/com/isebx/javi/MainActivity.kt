@@ -202,7 +202,8 @@ class MainActivity : Activity() {
     @SuppressLint("SetTextI18n")
     private fun refresh() {
         toggle.text = if (PetService.running) "Guardar a Javi" else "Sacar a Javi a la pantalla"
-        info.text = "Mimos: ${Store.mimos(this)}   ·   Comidas: ${Store.comidas(this)}"
+        info.text = "Mimos: ${Store.mimos(this)}   ·   Comidas: ${Store.comidas(this)}" +
+            "   ·   Regalitos: ${Store.regalos(this)}"
         val enabled = Settings.Secure.getString(
             contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
         ) ?: ""

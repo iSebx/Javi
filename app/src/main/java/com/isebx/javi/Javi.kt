@@ -19,7 +19,8 @@ class Javi {
     enum class St {
         WALK, CHASE, SIT, GROOM, STRETCH, SLEEP, PURR, POUNCE, EAT, BEG, RUB,
         HELD, FALL, JUMPTO, PERCH, HANG, SLIDE, CLING, BATH, SHAKE,
-        WATCH, REACH, CLIMB
+        WATCH, REACH, CLIMB,
+        KNEAD, YAWN, SNEEZE, WASH, DROP, BOX, STARE, SWAT
     }
 
     companion object {
@@ -69,6 +70,9 @@ class Javi {
         private val P_RUB = floatArrayOf(0f, 0f, 0f, 0f, -4f, 0f, 20f, 36f, -70f, 78f, 3f, 1f, 1f, 1f, 0.08f, 0f)
         private val P_WATCH = floatArrayOf(-85f, -85f, 49f, 49f, -55f, 21f, 0f, 9f, -86f, -30f, 14f, 1.48f, 1.31f, 1f, 1.15f, 0f)
         private val P_REACH = floatArrayOf(12f, 4f, -102f, -102f, -74f, 0f, 0f, 24f, -84f, 20f, 4f, 1.9f, 2.25f, 1f, 1.15f, 0f)
+        private val P_KNEAD = floatArrayOf(0f, 0f, -12f, -12f, 9f, 0f, 16f, 42f, -58f, 50f, 6f, 0.88f, 0.9f, 1f, 0.25f, 0f)
+        private val P_BOX = floatArrayOf(-85f, -85f, 49f, 49f, -55f, 21f, 0f, 9f, -86f, 70f, 10f, 1.48f, 1.31f, 1f, 1.15f, 0f)
+        private val P_STARE = floatArrayOf(-85f, -85f, 49f, 49f, -55f, 21f, 6f, 9f, -86f, -30f, 14f, 1.48f, 1.31f, 1f, 1.25f, 0f)
         private val P_BATH = floatArrayOf(-85f, -85f, 49f, 49f, -55f, 21f, 8f, 9f, -86f, -30f, 15f, 1.48f, 1.31f, 1f, 0.6f, 0f)
         private val P_CLING = floatArrayOf(50f, 40f, -55f, -45f, 0f, 12f, 6f, 34f, -60f, 85f, 0f, 1f, 1f, 0.8f, 1.25f, 0f)
         private val P_HANG = floatArrayOf(8f, -6f, -100f, -104f, -80f, 0f, -14f, 14f, -74f, -70f, 22f, 1.5f, 1.87f, 1f, 1f, 0f)
@@ -133,6 +137,19 @@ class Javi {
     private var wReach = 0f
     private var wClimb = 0f
     private var wBack = 0f
+    private var wYawn = 0f
+    private var wKnead = 0f
+    private var wWash = 0f
+    private var wSwat = 0f
+    private var wBox = 0f
+    private var boxSink = 62f
+    private var boxPeek = false
+    private var boxT = 0f
+    private var carrying = false
+    private var giftReady = false
+    private var flyQuick = false
+    private var flyReach = true
+    private var flyFollow = true
 
     // Lo que está mirando (la luciérnaga)
     private var flyX = 0f
@@ -172,6 +189,19 @@ class Javi {
 
     /** Hacia qué lado está lo que mira (para inclinar la cabeza de espaldas). */
     var lookDx = 0f; private set
+
+    /** Bostezo: cuánto abre la boca (0 a 1). */
+    var yawn = 0f; private set
+
+    /** Estornudo: el soplidito (0 a 1). */
+    var puff = 0f; private set
+
+    /** Lleva un regalito en la boca. */
+    var carry = false; private set
+
+    /** Cuánto está hundido dentro de la cajita, y qué tan visible es la caja. */
+    var sink = 0f; private set
+    var boxA = 0f; private set
     val tailX = FloatArray(TAIL_N + 1)
     val tailY = FloatArray(TAIL_N + 1)
     val heartX = FloatArray(2)
@@ -206,7 +236,7 @@ class Javi {
 
     /** Libre para que se le ocurra hacer algo nuevo. */
     val idle: Boolean
-        get() = !leaving &&
+        get() = !leaving && !carrying &&
             (st == St.WALK || st == St.SIT || st == St.GROOM || st == St.STRETCH)
 
     /** Ya salió caminando de la pantalla (volvió a su casa). */
@@ -224,6 +254,7 @@ class Javi {
         t0 = now
         goal = Float.NaN
         leaving = false
+        carrying = false
         val r = Random.nextFloat()
         dur = when (n) {
             St.WALK -> 5f + r * 5f
@@ -242,7 +273,14 @@ class Javi {
             St.JUMPTO -> 1f
             St.CLING -> 1.3f
             St.SHAKE -> 1.4f
-            St.WATCH, St.REACH -> 99999f
+            St.WATCH, St.REACH, St.SWAT -> 99999f
+            St.KNEAD -> 3.6f
+            St.YAWN -> 2.8f
+            St.SNEEZE -> 2.2f
+            St.WASH -> 3.6f
+            St.DROP -> 0.9f
+            St.BOX -> 14f + r * 6f
+            St.STARE -> 7f
             St.CLIMB -> 9f
             St.HELD, St.FALL, St.SLIDE, St.BATH -> 99999f
         }
@@ -250,8 +288,12 @@ class Javi {
 
     fun pet() {
         if (busy) return
-        if (perched) {
+        if (perched || st == St.BOX) {
             loveT = 2.5f
+            if (st == St.BOX) {
+                boxPeek = true
+                boxT = 3f
+            }
             return
         }
         set(St.PURR)
@@ -345,7 +387,13 @@ class Javi {
      * cerca se para en dos patas para manotearla, y si está más alta trepa.
      * maxAlt es hasta dónde puede trepar.
      */
-    fun attend(fx: Float, falt: Float, maxAlt: Float) {
+    fun attend(
+        fx: Float, falt: Float, maxAlt: Float,
+        quick: Boolean = false, reach: Boolean = true, follow: Boolean = true
+    ) {
+        flyQuick = quick
+        flyReach = reach
+        flyFollow = follow
         flyX = fx
         flyAlt = falt
         climbMax = maxAlt
@@ -354,6 +402,47 @@ class Javi {
         if (st == St.WALK || st == St.SIT || st == St.GROOM || st == St.STRETCH || st == St.BEG) {
             set(St.WATCH)
         }
+    }
+
+    /** Se mete en una cajita y espía. */
+    fun startBox() {
+        if (aloft) return
+        boxSink = 62f
+        boxPeek = false
+        boxT = 0.9f
+        set(St.BOX)
+    }
+
+    /** Va a buscar un regalito y lo trae hasta tx. */
+    fun startGift(tx: Float) {
+        if (!idle) return
+        goTo(tx, St.DROP)
+        carrying = true
+    }
+
+    /** true una sola vez, cuando acaba de dejar el regalito en el piso. */
+    fun takeGift(): Boolean {
+        val g = giftReady
+        giftReady = false
+        return g
+    }
+
+    /** Dónde está su nariz cuando está sentado (para la mariposa). */
+    val noseX: Float
+        get() = x + dir * 20f
+    val noseAlt: Float
+        get() = alt + 84f
+
+    /** Una mariposa se le posó en la nariz: se queda duro mirándola. */
+    fun stare(): Boolean {
+        if (st != St.WATCH && st != St.SIT) return false
+        set(St.STARE)
+        return true
+    }
+
+    /** La mariposa se fue: estornuda. */
+    fun endStare() {
+        if (st == St.STARE) set(St.SNEEZE)
     }
 
     /** Altura de sus patas delanteras cuando está estirado hacia arriba. */
@@ -366,7 +455,7 @@ class Javi {
 
     private fun stepAttention(dt: Float) {
         if (climbCool > 0f) climbCool -= dt
-        if (st != St.WATCH && st != St.REACH && st != St.CLIMB) return
+        if (st != St.WATCH && st != St.REACH && st != St.CLIMB && st != St.SWAT) return
         val lost = now - flySeen > 0.4f
         val d = flyX - x
         val ad = abs(d)
@@ -392,12 +481,17 @@ class Javi {
             if (ad > 85f || flyAlt > 330f || flyAlt < 80f) set(St.WATCH)
             return
         }
+        if (st == St.SWAT) {
+            if (ad > 90f || flyAlt > 112f) set(St.WATCH)
+            return
+        }
         // WATCH
         if (ad > 115f) {
-            x = (x + dir * SPEED * dt).coerceIn(x0, x1)
-        } else if (ad < 60f) {
+            if (flyFollow) x = (x + dir * (if (flyQuick) 95f else SPEED) * dt).coerceIn(x0, x1)
+        } else if (ad < 70f && flyReach) {
             // Se estira contra la pantalla, con las patas de atrás en el piso. No trepa.
             if (flyAlt in 95f..300f) set(St.REACH)
+            else if (flyAlt < 95f) set(St.SWAT)
         }
     }
 
@@ -474,25 +568,42 @@ class Javi {
             if (alt > 5f) drop() else land()
             return
         }
-        if (st == St.EAT || st == St.RUB) {
-            set(St.PURR)
-            return
+        when (st) {
+            St.EAT -> { set(St.WASH); return }
+            St.WASH, St.RUB -> { set(St.PURR); return }
+            St.KNEAD -> { set(St.SLEEP); return }
+            St.SLEEP -> { set(St.YAWN); return }
+            St.STARE -> { set(St.SNEEZE); return }
+            St.DROP -> { giftReady = true; set(St.PURR); return }
+            else -> {}
         }
         if (st != St.WALK) {
             set(St.WALK)
             return
         }
         val r = Random.nextFloat()
-        set(
-            when {
-                night && r < 0.7f -> St.SLEEP
-                r < 0.25f -> St.SIT
-                r < 0.45f -> St.GROOM
-                r < 0.60f -> St.STRETCH
-                r < 0.85f -> St.SLEEP
-                else -> St.POUNCE
-            }
-        )
+        if (night && r < 0.7f) {
+            set(St.KNEAD)
+            return
+        }
+        when {
+            r < 0.22f -> set(St.SIT)
+            r < 0.40f -> set(St.GROOM)
+            r < 0.52f -> set(St.STRETCH)
+            r < 0.76f -> set(St.KNEAD)
+            r < 0.82f -> set(St.SNEEZE)
+            r < 0.88f -> startBox()
+            else -> set(St.POUNCE)
+        }
+    }
+
+    /** Sube de 0 a 1 entre a y b, se mantiene hasta c y baja hasta d. */
+    private fun ramp(t: Float, a: Float, b: Float, c: Float, d: Float): Float = when {
+        t < a -> 0f
+        t < b -> (t - a) / (b - a)
+        t < c -> 1f
+        t < d -> 1f - (t - c) / (d - c)
+        else -> 0f
     }
 
     private fun toward(current: Float, on: Boolean, f: Float): Float =
@@ -550,7 +661,14 @@ class Javi {
             St.BEG -> P_BEG
             St.RUB -> P_RUB
             St.HANG, St.SLIDE, St.CLIMB -> P_HANG
-            St.WATCH -> if (abs(flyX - x) > 115f) P_WALK else P_WATCH
+            St.WATCH -> if (flyFollow && abs(flyX - x) > 115f) P_WALK else P_WATCH
+            St.KNEAD -> P_KNEAD
+            St.YAWN, St.SNEEZE -> P_SIT
+            St.WASH -> P_GROOM
+            St.DROP -> P_EAT
+            St.BOX -> P_BOX
+            St.STARE -> P_STARE
+            St.SWAT -> P_BEG
             St.REACH -> P_WATCH
             St.CLING -> P_CLING
             St.BATH -> P_BATH
@@ -569,7 +687,23 @@ class Javi {
         for (i in 0 until N) {
             if (i != EYE) s[i] += (target[i] - s[i]) * f
         }
+        val tq = now - t0
+        var yw = 0f
+        var snA = 0f
+        var snS = 0f
+        var pf = 0f
+        if (st == St.YAWN) yw = ramp(tq, 0.4f, 1f, 1.9f, 2.5f)
+        if (st == St.SNEEZE) {
+            snA = ramp(tq, 0.2f, 1f, 1f, 1.02f)
+            snS = ramp(tq, 1f, 1.06f, 1.2f, 1.7f)
+            pf = ramp(tq, 1.02f, 1.08f, 1.2f, 1.5f)
+        }
+        wYawn += (yw - wYawn) * (1f - exp(-dt * 16f))
+        puff += (pf - puff) * (1f - exp(-dt * 30f))
+        yawn = wYawn
         var et = target[EYE]
+        if (yw > 0.3f) et = 0.08f
+        if (snS > 0.2f) et = 0.05f else if (snA > 0.1f) et = 0.45f
         if (now > blinkAt) {
             et = 0.08f
             if (now > blinkAt + 0.14f) blinkAt = now + 2f + Random.nextFloat() * 3f
@@ -578,9 +712,9 @@ class Javi {
 
         val wf = 1f - exp(-dt * 8f)
         leaping = leap
-        val stalking = st == St.WATCH && abs(flyX - x) > 115f
+        val stalking = st == St.WATCH && flyFollow && abs(flyX - x) > 115f
         wWalk = toward(wWalk, st == St.WALK || st == St.CHASE || stalking, wf)
-        wRun = toward(wRun, st == St.CHASE || leaving, wf)
+        wRun = toward(wRun, st == St.CHASE || leaving || (stalking && flyQuick), wf)
         wGroom = toward(wGroom, st == St.GROOM, wf)
         wSleep = toward(wSleep, st == St.SLEEP, wf)
         wCrouch = toward(wCrouch, crouch, wf)
@@ -591,7 +725,11 @@ class Javi {
         wHang = toward(wHang, st == St.HANG, wf)
         wCling = toward(wCling, st == St.CLING, 1f - exp(-dt * 20f))
         wSlide = toward(wSlide, st == St.SLIDE, wf)
-        wLook = toward(wLook, st == St.WATCH || st == St.REACH || st == St.CLIMB, wf)
+        wLook = toward(wLook, st == St.WATCH || st == St.REACH || st == St.CLIMB || st == St.SWAT, wf)
+        wKnead = toward(wKnead, st == St.KNEAD, wf)
+        wWash = toward(wWash, st == St.WASH, wf)
+        wSwat = toward(wSwat, st == St.SWAT, wf)
+        wBox = toward(wBox, st == St.BOX, wf)
         wReach = toward(wReach, st == St.REACH, wf)
         wClimb = toward(wClimb, st == St.CLIMB, wf)
         // Ángulo de la mirada hacia la luciérnaga (negativo = hacia arriba)
@@ -630,16 +768,33 @@ class Javi {
         val cl = sin(now * 8f) * wClimb
         val swat = 0.7f * wReach + 0.6f * wClimb
         bl1 = s[BL1] + sw + sin(now * 2.2f) * 7f * wHang - cl * 14f
-        fl2 = s[FL2] + sw + sin(now * 9f + 2.2f) * 13f * swat - cl * 8f
+        fl2 = s[FL2] + sw + sin(now * 9f + 2.2f) * 13f * swat - cl * 8f - sin(now * 6f) * 13f * wKnead
         bl2 = s[BL2] - sw - sin(now * 2.2f + 0.6f) * 7f * wHang + cl * 14f
-        fl1 = s[FL1] - sw + g * 8f + sin(now * 9f) * 15f * swat + cl * 8f
+        fl1 = s[FL1] - sw + g * 8f + sin(now * 9f) * 15f * swat + cl * 8f +
+            sin(now * 6f) * 13f * wKnead + (sin(now * 5f) * 14f - 6f) * wWash +
+            (sin(now * 7f) * 22f - 8f) * wSwat
         val bob = -abs(sin(p)) * 1.6f * wWalk + sin(now * 1.8f) * 0.9f * wSleep
-        py = s[PY] + bob
+        py = s[PY] + bob + 3f * snS
         val shk = sin(now * 38f) * wShake
         torso = s[TORSO] + sin(now * 32f) * 2.5f * wCrouch + rb * 3f + shk * 5f
         head = s[HEAD] + sin(p * 2f) * 2.5f * wWalk + g * 5f +
             sin(now * 3f) * 4f * wPurr + sin(now * 9f) * 4f * wEat + rb * 12f +
-            sin(now * 38f + 1.2f) * 14f * wShake + look * wLook
+            sin(now * 38f + 1.2f) * 14f * wShake + look * wLook +
+            (sin(now * 5f + 0.6f) * 8f + 4f) * wWash - 18f * wYawn - 15f * snA + 24f * snS
+
+        // Cajita: se esconde y asoma
+        if (st == St.BOX) {
+            boxT -= dt
+            if (boxT <= 0f) {
+                boxPeek = !boxPeek
+                boxT = if (boxPeek) 1.6f + Random.nextFloat() * 1.8f else 0.8f + Random.nextFloat()
+            }
+            boxSink += ((if (boxPeek) 30f else 62f) - boxSink) * (1f - exp(-dt * 9f))
+            if (boxPeek) head += sin(now * 3f) * 8f
+        }
+        sink = boxSink * wBox
+        boxA = wBox
+        carry = carrying || st == St.DROP
         headX = s[HX] + rb * 4f
         headY = s[HY] + bob
         fs1 = s[FS1]

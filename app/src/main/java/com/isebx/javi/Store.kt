@@ -22,6 +22,12 @@ object Store {
         prefs(c).edit().putInt(COMIDAS, comidas(c) + 1).apply()
     }
 
+    fun regalos(c: Context): Int = prefs(c).getInt("regalos", 0)
+
+    fun addRegalo(c: Context) {
+        prefs(c).edit().putInt("regalos", regalos(c) + 1).apply()
+    }
+
     const val SIZE_MIN = 0.35f
     const val SIZE_MAX = 0.95f
     const val SIZE_STEP = 0.07f

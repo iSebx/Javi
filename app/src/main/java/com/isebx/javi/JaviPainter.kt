@@ -270,6 +270,11 @@ class JaviPainter {
         c.translate(j.jitter, 0f)
         // Al darse vuelta se afina hasta quedar de canto
         c.scale(j.dir * (1f - 2f * j.turn).coerceAtLeast(0.04f), 1f)
+        if (j.sink > 0.5f) {
+            // Dentro de la cajita: hundido y recortado al ras del piso
+            c.clipRect(-130f, -400f, 130f, 0.5f)
+            c.translate(0f, j.sink)
+        }
         if (j.sway > 0.01f || j.sway < -0.01f) c.rotate(j.sway, -8f, -Javi.HANG_LEN)
 
         // Cola
@@ -333,8 +338,30 @@ class JaviPainter {
             c.drawOval(6.5f, 11.5f, 13.5f, 20.5f, fill)
             fill.alpha = 255
         }
+        if (j.yawn > 0.03f) {
+            fill.color = 0xFFA8474F.toInt()
+            fill.alpha = (j.yawn * 1.6f).coerceIn(0f, 1f).let { (it * 255).toInt() }
+            c.drawOval(4.5f, 14f - (1f + 8f * j.yawn), 14.5f, 14f + (1f + 8f * j.yawn), fill)
+            fill.alpha = 255
+        }
         fill.color = nose
         c.drawPath(nosePath, fill)
+        if (j.puff > 0.03f) {
+            stroke.strokeWidth = 2f
+            stroke.color = water
+            stroke.alpha = (j.puff.coerceIn(0f, 1f) * 255).toInt()
+            c.drawLine(30f, 8f, 42f, 5f, stroke)
+            c.drawLine(31f, 13f, 44f, 15f, stroke)
+            c.drawLine(29f, 18f, 40f, 24f, stroke)
+            stroke.alpha = 255
+        }
+        if (j.carry) {
+            c.save()
+            c.translate(14f, 14f)
+            c.rotate(80f)
+            Props.draw(c, Props.FLOWER)
+            c.restore()
+        }
         stroke.strokeWidth = 1.3f
         stroke.color = dark
         c.drawPath(mouth, stroke)
@@ -364,6 +391,27 @@ class JaviPainter {
         c.restore()
         } else {
             drawBack(c, j)
+        }
+
+        // La cajita, por delante
+        if (j.boxA > 0.02f) {
+            val a = (j.boxA.coerceIn(0f, 1f) * 255).toInt()
+            stroke.strokeWidth = 6f
+            stroke.color = 0xFFB5855A.toInt()
+            stroke.alpha = a
+            c.drawLine(-64f, -55f, -80f, -65f, stroke)
+            c.drawLine(64f, -55f, 80f, -65f, stroke)
+            stroke.alpha = 255
+            fill.color = 0xFFC99A6B.toInt()
+            fill.alpha = a
+            c.drawRect(-64f, -55f, 64f, 0.5f, fill)
+            fill.color = 0xFFB5855A.toInt()
+            fill.alpha = a
+            c.drawRect(-64f, -55f, 64f, -49f, fill)
+            fill.color = 0xFFDFC39A.toInt()
+            fill.alpha = (a * 0.7f).toInt()
+            c.drawRect(-8f, -49f, 8f, 0.5f, fill)
+            fill.alpha = 255
         }
 
         // Mojado: gotitas que brillan y gotean

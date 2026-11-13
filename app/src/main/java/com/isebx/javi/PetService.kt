@@ -80,6 +80,12 @@ class PetService : Service() {
     private var flyLp: WindowManager.LayoutParams? = null
     private var flyTimer = 25f
 
+    private var giftView: GiftView? = null
+    private var giftLife = 0f
+    private var giftTimer = 100f
+
+    private var wand: WandView? = null
+
     private var wheel: WheelView? = null
     private var bath: BathView? = null
     private var menuLevel = MENU_MAIN
@@ -108,6 +114,12 @@ class PetService : Service() {
             stepYarn(dt)
             stepIcons(dt)
             stepFly(dt)
+            stepGift(dt)
+            wand?.let {
+                it.step(dt)
+                javi.attend(it.tipX / unit, (floorY - it.tipY) / unit, maxClimb(), true, true, true)
+                it.invalidate()
+            }
             bath?.let {
                 it.step(dt)
                 it.invalidate()
@@ -119,7 +131,7 @@ class PetService : Service() {
             }
             place()
             view?.invalidate()
-            if (javi.calm && !yarn.active && !fly.active) {
+            if (javi.calm && !yarn.active && !fly.active && wand == null) {
                 Choreographer.getInstance().postFrameCallbackDelayed(this, 60)
             } else {
                 Choreographer.getInstance().postFrameCallback(this)
@@ -152,6 +164,7 @@ class PetService : Service() {
                     active = false
                     sensors?.unregisterListener(shake)
                     endBath()
+                    endWand()
                     closeMenu()
                 }
                 Intent.ACTION_SCREEN_ON -> resumeLoop()
@@ -225,6 +238,8 @@ class PetService : Service() {
         }
         closeMenu()
         endBath()
+        endWand()
+        removeGift()
         removeYarnWindow()
         removeFlyWindow()
         removeQuietly(view)
@@ -399,6 +414,7 @@ class PetService : Service() {
         removeYarnWindow()
         fly.active = false
         removeFlyWindow()
+        removeGift()
         removeQuietly(view)
         view = null
         javi.x = javi.x * old / next
@@ -662,8 +678,8 @@ class PetService : Service() {
                 Props.FOOD_NAMES
             )
             MENU_PLAY -> w.show(
-                intArrayOf(Props.YARN, Props.FIREFLY),
-                arrayOf("Ovillo", "Luciérnaga")
+                intArrayOf(Props.YARN, Props.FIREFLY, Props.BUTTERFLY, Props.WAND, Props.BOX),
+                arrayOf("Ovillo", "Luciérnaga", "Mariposa", "Plumero", "Cajita")
             )
             MENU_SIZE -> w.show(
                 intArrayOf(Props.MINUS, Props.OK, Props.PLUS),
@@ -699,7 +715,13 @@ class PetService : Service() {
             }
             MENU_PLAY -> {
                 closeMenu()
-                if (i == 0) throwYarn() else releaseFly()
+                when (i) {
+                    0 -> throwYarn()
+                    1 -> releaseFly(Firefly.FIREFLY)
+                    2 -> releaseFly(Firefly.BUTTERFLY)
+                    3 -> startWand()
+                    4 -> javi.startBox()
+                }
             }
             MENU_SIZE -> when (i) {
                 0 -> resize(-Store.SIZE_STEP)
@@ -718,11 +740,17 @@ class PetService : Service() {
 
     private fun maxClimb(): Float = floorY * 0.8f / unit - Javi.HANG_LEN
 
-    private fun releaseFly() {
-        if (fly.active || bath != null) return
+    private fun releaseFly(kind: Int) {
+        if (fly.active || bath != null || wand != null) return
         val w = screenW / unit
-        fly.spawn(0f, w, floorY * 0.85f / unit)
+        fly.spawn(0f, w, floorY * 0.85f / unit, kind)
         if (flyView == null) addFlyWindow()
+    }
+
+    /** De día pasa una mariposa; de noche, una luciérnaga. */
+    private fun timeKind(): Int {
+        val h = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+        return if (h in 7..18) Firefly.BUTTERFLY else Firefly.FIREFLY
     }
 
     private fun addFlyWindow() {
@@ -767,17 +795,31 @@ class PetService : Service() {
             if (flyTimer <= 0f) {
                 flyTimer = if (javi.night) 45f + Random.nextFloat() * 50f
                 else 80f + Random.nextFloat() * 90f
-                if (javi.idle && !yarn.active && wheel == null && bath == null) releaseFly()
+                if (javi.idle && !yarn.active && wheel == null && bath == null) releaseFly(timeKind())
             }
             return
         }
-        fly.update(dt, javi.x, javi.pawAlt, javi.swatting)
-        if (!fly.active || bath != null) {
+        if (fly.kind == Firefly.BUTTERFLY) {
+            val host = javi.st == Javi.St.WATCH || javi.st == Javi.St.STARE
+            val ev = fly.updateButterfly(dt, host, javi.noseX, javi.noseAlt)
+            if (ev == 1 && !javi.stare()) fly.updateButterfly(0f, false, javi.noseX, javi.noseAlt)
+            if (ev == 2) javi.endStare()
+        } else {
+            fly.update(dt, javi.x, javi.pawAlt, javi.swatting)
+        }
+        if (!fly.active || bath != null || wand != null) {
             fly.active = false
+            javi.endStare()
             removeFlyWindow()
             return
         }
-        if (!yarn.active) javi.attend(fly.x, fly.alt, maxClimb())
+        if (!yarn.active && !fly.landed) {
+            if (fly.kind == Firefly.BUTTERFLY) {
+                javi.attend(fly.x, fly.alt, maxClimb(), false, false, false)
+            } else {
+                javi.attend(fly.x, fly.alt, maxClimb())
+            }
+        }
         val v = flyView ?: return
         val params = flyLp ?: return
         if (placeFly(params)) {
@@ -790,10 +832,95 @@ class PetService : Service() {
         v.invalidate()
     }
 
+    // ---------- Regalito ----------
+
+    /** Cada tanto Javi trae una flor y la deja en el piso; se toca para aceptarla. */
+    @SuppressLint("ClickableViewAccessibility")
+    private fun stepGift(dt: Float) {
+        if (giftView != null) {
+            giftLife -= dt
+            if (giftLife <= 0f) removeGift()
+        }
+        if (javi.takeGift() && giftView == null) {
+            val v = GiftView(this, unit)
+            val side = (GiftView.HALF * 2f * unit).toInt()
+            val params = overlayParams(side, side)
+            params.x = ((javi.x + javi.dir * 66f - GiftView.HALF) * unit).toInt()
+            params.y = floorY - side
+            v.setOnTouchListener { _, e ->
+                if (e.actionMasked == MotionEvent.ACTION_UP) {
+                    Store.addRegalo(this)
+                    javi.pet()
+                    removeGift()
+                }
+                true
+            }
+            try {
+                wm.addView(v, params)
+                giftView = v
+                giftLife = 35f
+            } catch (e: Exception) {
+                giftView = null
+            }
+        }
+        giftTimer -= dt
+        if (giftTimer <= 0f) {
+            giftTimer = 180f + Random.nextFloat() * 240f
+            if (javi.idle && giftView == null && !yarn.active && !fly.active &&
+                wheel == null && bath == null && wand == null
+            ) {
+                val w = screenW / unit
+                javi.startGift(w * (0.3f + Random.nextFloat() * 0.4f))
+            }
+        }
+    }
+
+    private fun removeGift() {
+        removeQuietly(giftView)
+        giftView = null
+    }
+
+    // ---------- Plumero ----------
+
+    private fun startWand() {
+        if (wand != null || bath != null) return
+        yarn.active = false
+        fly.active = false
+        val w = WandView(this, resources.displayMetrics.density)
+        w.onExit = { handler.post { endWand() } }
+        val params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            PixelFormat.TRANSLUCENT
+        )
+        params.gravity = Gravity.TOP or Gravity.START
+        if (Build.VERSION.SDK_INT >= 28) {
+            params.layoutInDisplayCutoutMode =
+                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+        }
+        try {
+            wm.addView(w, params)
+            wand = w
+        } catch (e: Exception) {
+            wand = null
+        }
+    }
+
+    private fun endWand() {
+        val w = wand ?: return
+        wand = null
+        removeQuietly(w)
+    }
+
     // ---------- Baño ----------
 
     private fun startBath() {
         if (bath != null) return
+        endWand()
         yarn.active = false
         perchRect = null
         javi.startBath()

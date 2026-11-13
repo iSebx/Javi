@@ -22,6 +22,10 @@ object Props {
     const val SHOWER = 13
     const val BACK = 14
     const val FIREFLY = 15
+    const val BUTTERFLY = 16
+    const val WAND = 17
+    const val BOX = 18
+    const val FLOWER = 19
 
     val FOOD_NAMES = arrayOf("Pollo", "Carnecita", "Pescado", "Leche", "Zapallo")
 
@@ -120,6 +124,38 @@ object Props {
                 c.drawCircle(0f, -4f, 3.2f, f(0xFF4A3B2A.toInt()))
                 c.drawOval(-11f, -8f, -2f, -2f, f(0xFFDCEBFA.toInt()))
                 c.drawOval(2f, -8f, 11f, -2f, f(0xFFDCEBFA.toInt()))
+            }
+            BUTTERFLY -> {
+                c.drawOval(-12f, -11f, 0f, 5f, f(0xFF7FB7E6.toInt()))
+                c.drawOval(0f, -11f, 12f, 5f, f(0xFF7FB7E6.toInt()))
+                c.drawOval(-8.5f, 0f, -0.5f, 10f, f(0xFFA9D2F2.toInt()))
+                c.drawOval(0.5f, 0f, 8.5f, 10f, f(0xFFA9D2F2.toInt()))
+                c.drawRoundRect(-1f, -7f, 1f, 7f, 1f, 1f, f(0xFF3A2418.toInt()))
+            }
+            WAND -> {
+                c.drawLine(11f, -12f, -3f, 2f, s(0xFF8A6A4A.toInt(), 2.4f))
+                c.save()
+                c.translate(-4f, 3f)
+                c.rotate(40f)
+                c.drawOval(-4f, -2f, 4f, 12f, f(0xFFD9627A.toInt()))
+                c.drawOval(-8f, -1f, -2f, 10f, f(0xFFF2A6B6.toInt()))
+                c.drawOval(2f, -1f, 8f, 10f, f(0xFFF2A6B6.toInt()))
+                c.restore()
+            }
+            BOX -> {
+                c.drawLine(-11f, -5f, -14f, -9f, s(0xFFB5855A.toInt(), 2.4f))
+                c.drawLine(11f, -5f, 14f, -9f, s(0xFFB5855A.toInt(), 2.4f))
+                c.drawRect(-11f, -5f, 11f, 10f, f(0xFFC99A6B.toInt()))
+                c.drawRect(-11f, -5f, 11f, -2.5f, f(0xFFB5855A.toInt()))
+                c.drawRect(-1.8f, -2.5f, 1.8f, 10f, f(0xFFDFC39A.toInt()))
+            }
+            FLOWER -> {
+                c.drawLine(0f, 0f, 0f, -16f, s(0xFF6E8B3D.toInt(), 2f))
+                c.drawCircle(-4f, -19f, 3.4f, f(0xFFEF9DB0.toInt()))
+                c.drawCircle(4f, -19f, 3.4f, f(0xFFEF9DB0.toInt()))
+                c.drawCircle(0f, -23f, 3.4f, f(0xFFEF9DB0.toInt()))
+                c.drawCircle(0f, -15.5f, 3.4f, f(0xFFEF9DB0.toInt()))
+                c.drawCircle(0f, -19f, 2.6f, f(0xFFFFE27A.toInt()))
             }
             BRUSH -> {
                 c.drawRoundRect(-12f, -9f, 12f, -2f, 3f, 3f, f(0xFFB9794A.toInt()))
