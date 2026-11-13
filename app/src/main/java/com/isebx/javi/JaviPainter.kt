@@ -130,6 +130,132 @@ class JaviPainter {
         c.restore()
     }
 
+    private val backStripes = Path().apply {
+        moveTo(-17.9f, -58.2f); rQuadTo(17.9f, -7f, 35.8f, 0f)
+        moveTo(-19.2f, -45.4f); rQuadTo(19.2f, -7f, 38.4f, 0f)
+        moveTo(-15.4f, -33.3f); rQuadTo(15.4f, -5.8f, 30.7f, 0f)
+    }
+    private val backHeadStripes = Path().apply {
+        moveTo(-7f, -122.2f); lineTo(-7f, -115.8f)
+        moveTo(0f, -123.5f); lineTo(0f, -115.8f)
+        moveTo(7f, -122.2f); lineTo(7f, -115.8f)
+    }
+    private val backEarL = Path().apply {
+        moveTo(-28.2f, -108.2f); lineTo(-25.6f, -140.2f); lineTo(-2.6f, -122.2f); close()
+    }
+    private val backEarLIn = Path().apply {
+        moveTo(-23.7f, -114.6f); lineTo(-21.8f, -131.2f); lineTo(-10.2f, -121f); close()
+    }
+    private val backEarR = Path().apply {
+        moveTo(28.2f, -108.2f); lineTo(25.6f, -140.2f); lineTo(2.6f, -122.2f); close()
+    }
+    private val backEarRIn = Path().apply {
+        moveTo(23.7f, -114.6f); lineTo(21.8f, -131.2f); lineTo(10.2f, -121f); close()
+    }
+    private val backWhiskers = Path().apply {
+        moveTo(-30.7f, -95.4f); lineTo(-41f, -97.9f)
+        moveTo(-30.7f, -91.5f); lineTo(-40.3f, -89.6f)
+        moveTo(30.7f, -95.4f); lineTo(41f, -97.9f)
+        moveTo(30.7f, -91.5f); lineTo(40.3f, -89.6f)
+    }
+
+    private fun backArm(c: Canvas, side: Float, off: Float) {
+        c.save()
+        c.translate(0f, off)
+        c.rotate(-16f * side, -20.5f * side, -81.3f)
+        val x0 = if (side > 0f) -26.9f else 14.1f
+        val x1 = if (side > 0f) -14.1f else 26.9f
+        stroke.strokeWidth = 1.5f
+        stroke.color = dark
+        for (k in -1..1) {
+            val cx = (x0 + x1) / 2f + k * 3.8f
+            c.drawLine(cx, -130f, cx, -136.5f, stroke)
+        }
+        fill.color = furFar
+        c.drawRoundRect(x0, -129.9f, x1, -80f, 6.4f, 6.4f, fill)
+        fill.color = cream
+        c.drawRoundRect(x0, -132.5f, x1, -118.4f, 6.4f, 6.4f, fill)
+        c.restore()
+    }
+
+    private fun backFoot(c: Canvas, cx: Float) {
+        fill.color = cream
+        c.drawOval(cx - 9f, -11.9f, cx + 9f, 0.3f, fill)
+        fill.color = pink
+        c.drawOval(cx - 3.5f, -6.8f, cx + 3.5f, -2.2f, fill)
+        c.drawCircle(cx - 4.8f, -7.7f, 1.3f, fill)
+        c.drawCircle(cx, -9f, 1.3f, fill)
+        c.drawCircle(cx + 4.8f, -7.7f, 1.3f, fill)
+    }
+
+    /**
+     * Javi de espaldas, estirado contra la pantalla: patas de atrás rectas,
+     * las de adelante arriba manoteando. Mismas proporciones que de costado.
+     */
+    private fun drawBack(c: Canvas, j: Javi) {
+        val t = j.time
+        c.save()
+        c.translate(j.jitter, 0f)
+        c.scale((2f * j.turn - 1f).coerceIn(0.04f, 1f), 1f)
+
+        // Cola
+        c.save()
+        c.rotate(kotlin.math.sin(t * 2.4f) * 6f, 9f, -32.6f)
+        stroke.strokeWidth = 10.5f
+        stroke.color = fur
+        path.rewind()
+        path.moveTo(9f, -32.6f)
+        path.quadTo(38.4f, -28.8f, 41f, -49.3f)
+        path.quadTo(41.6f, -59.5f, 33.3f, -60.8f)
+        c.drawPath(path, stroke)
+        stroke.color = furDark
+        path.rewind()
+        path.moveTo(41f, -48f)
+        path.quadTo(41.6f, -59.5f, 33.3f, -60.8f)
+        c.drawPath(path, stroke)
+        c.restore()
+
+        // Patas de atrás, estiradas
+        fill.color = furFar
+        c.drawRoundRect(-19.2f, -37.8f, -5.1f, -4.5f, 7f, 7f, fill)
+        c.drawRoundRect(5.1f, -37.8f, 19.2f, -4.5f, 7f, 7f, fill)
+        backFoot(c, -12.8f)
+        backFoot(c, 12.8f)
+
+        // Patas de adelante, alternando contra la pantalla
+        val sw = kotlin.math.sin(t * 7f) * 3.5f
+        backArm(c, 1f, 3.5f + sw)
+        backArm(c, -1f, 3.5f - sw)
+
+        // Cuerpo
+        fill.color = fur
+        c.drawOval(-28.2f, -85.1f, 28.2f, -23.7f, fill)
+        stroke.strokeWidth = 3.2f
+        stroke.color = furDark
+        c.drawPath(backStripes, stroke)
+
+        // Cabeza, inclinada hacia lo que mira
+        c.save()
+        c.rotate((j.lookDx * 0.22f).coerceIn(-9f, 9f) + kotlin.math.sin(t * 1.3f) * 2f, 0f, -81.3f)
+        fill.color = fur
+        c.drawPath(backEarL, fill)
+        c.drawPath(backEarR, fill)
+        fill.color = furDark
+        c.drawPath(backEarLIn, fill)
+        c.drawPath(backEarRIn, fill)
+        fill.color = fur
+        c.drawOval(-32f, -126.1f, 32f, -72.3f, fill)
+        stroke.strokeWidth = 2.9f
+        stroke.color = furDark
+        c.drawPath(backHeadStripes, stroke)
+        stroke.strokeWidth = 1f
+        stroke.color = 0xFFFFFFFF.toInt()
+        c.drawPath(backWhiskers, stroke)
+        c.restore()
+
+        c.restore()
+    }
+
     fun draw(c: Canvas, j: Javi) {
         claws = j.claws
         trail = j.trail
@@ -139,9 +265,11 @@ class JaviPainter {
         furDark = mix(0xFFE2B181.toInt(), 0xFFB98455.toInt(), w)
         cream = mix(0xFFF9E8D2.toInt(), 0xFFE6CDAE.toInt(), w)
         creamFar = mix(0xFFECD6B8.toInt(), 0xFFD6B994.toInt(), w)
+        if (j.turn < 0.5f) {
         c.save()
         c.translate(j.jitter, 0f)
-        c.scale(j.dir, 1f)
+        // Al darse vuelta se afina hasta quedar de canto
+        c.scale(j.dir * (1f - 2f * j.turn).coerceAtLeast(0.04f), 1f)
         if (j.sway > 0.01f || j.sway < -0.01f) c.rotate(j.sway, -8f, -Javi.HANG_LEN)
 
         // Cola
@@ -234,6 +362,9 @@ class JaviPainter {
             c.restore()
         }
         c.restore()
+        } else {
+            drawBack(c, j)
+        }
 
         // Mojado: gotitas que brillan y gotean
         if (j.wet > 0.12f) {

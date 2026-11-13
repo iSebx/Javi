@@ -32,7 +32,7 @@ class Javi {
         const val HANG_LEN = 123f
 
         /** Hasta dónde llegan sus patas cuando se estira contra la pantalla. */
-        const val REACH_LEN = 155f
+        const val REACH_LEN = 150f
 
         private const val BL1 = 0
         private const val BL2 = 1
@@ -132,6 +132,7 @@ class Javi {
     private var wLook = 0f
     private var wReach = 0f
     private var wClimb = 0f
+    private var wBack = 0f
 
     // Lo que está mirando (la luciérnaga)
     private var flyX = 0f
@@ -165,6 +166,12 @@ class Javi {
 
     /** Cuánto se alarga el cuerpo al estirarse (0 = normal). */
     var stretch = 0f; private set
+
+    /** 0 = de costado, 1 = de espaldas estirado contra la pantalla. */
+    var turn = 0f; private set
+
+    /** Hacia qué lado está lo que mira (para inclinar la cabeza de espaldas). */
+    var lookDx = 0f; private set
     val tailX = FloatArray(TAIL_N + 1)
     val tailY = FloatArray(TAIL_N + 1)
     val heartX = FloatArray(2)
@@ -544,7 +551,7 @@ class Javi {
             St.RUB -> P_RUB
             St.HANG, St.SLIDE, St.CLIMB -> P_HANG
             St.WATCH -> if (abs(flyX - x) > 115f) P_WALK else P_WATCH
-            St.REACH -> P_REACH
+            St.REACH -> P_WATCH
             St.CLING -> P_CLING
             St.BATH -> P_BATH
             St.SHAKE -> P_WALK
@@ -643,7 +650,10 @@ class Javi {
         sway = sin(now * 2.2f) * 6f * wHang * (1f - wSlide) * (1f - wClimb)
         jitter = sin(now * 62f) * 1.6f * wCling + sin(now * 45f) * 0.8f * wSlide + shk * 2.5f
         shaking = wShake
-        stretch = 0.3f * wReach
+        stretch = 0f
+        wBack = toward(wBack, st == St.REACH, 1f - exp(-dt * 7f))
+        turn = wBack
+        lookDx = flyX - x
         claws = max(max(wCling, wSlide), wClimb)
         trail = wSlide
 
