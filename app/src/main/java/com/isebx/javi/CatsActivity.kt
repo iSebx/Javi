@@ -67,7 +67,9 @@ class CatsActivity : Activity() {
         col.removeAllViews()
         val active = CatStore.activeId(this)
         val unit = resources.displayMetrics.density * 0.5f
-        for (cat in CatStore.all(this)) {
+        val cats = CatStore.all(this)
+        val many = cats.size > 1
+        for (cat in cats) {
             val row = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
@@ -124,11 +126,34 @@ class CatsActivity : Activity() {
                     )
                 }
             })
+            if (many) {
+                buttons.addView(Button(this).apply {
+                    text = "Quitar"
+                    setAllCaps(false)
+                    textSize = 13f
+                    setOnClickListener { confirmRemove(cat) }
+                })
+            }
             row.addView(buttons)
             col.addView(row, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply { bottomMargin = dp(10f) })
         }
+    }
+
+    private fun confirmRemove(cat: CatStore.Cat) {
+        AlertDialog.Builder(this)
+            .setTitle("¿Quitar a ${cat.look.name} de la lista?")
+            .setMessage("Deja de aparecer acá. No se puede deshacer.")
+            .setPositiveButton("Quitar") { _, _ ->
+                CatStore.remove(this, cat.id)
+                if (PetService.running) {
+                    startService(Intent(this, PetService::class.java).setAction(PetService.ACTION_REFRESH))
+                }
+                fill()
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
     }
 
     /** Un gato nuevo arranca desde una plantilla y después se retoca todo. */

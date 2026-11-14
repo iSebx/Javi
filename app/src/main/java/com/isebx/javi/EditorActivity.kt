@@ -2,7 +2,6 @@ package com.isebx.javi
 
 import android.annotation.SuppressLint
 import android.app.Activity
-import android.app.AlertDialog
 import android.content.Intent
 import android.os.Bundle
 import android.text.Editable
@@ -218,25 +217,24 @@ class EditorActivity : Activity() {
         })
         section("Collar", Ui.palette(this, COLLARS, look.collar, "Sin collar") { look.collar = it })
 
-        // Guardar / eliminar
+        // Cancelar / guardar
         val bar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
             setPadding(dp(16f), dp(6f), dp(16f), dp(10f))
         }
-        if (catId >= 0 && CatStore.all(this).size > 1) {
-            bar.addView(Button(this).apply {
-                text = "Eliminar"
-                setAllCaps(false)
-                setOnClickListener { confirmDelete() }
-            }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-        }
+        bar.addView(Button(this).apply {
+            text = "Cancelar"
+            setAllCaps(false)
+            textSize = 16f
+            setOnClickListener { finish() }
+        }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         bar.addView(Button(this).apply {
             text = "Guardar"
             setAllCaps(false)
             textSize = 16f
             setOnClickListener { save() }
-        }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 2f))
+        }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         root.addView(bar)
 
         setContentView(root)
@@ -250,21 +248,6 @@ class EditorActivity : Activity() {
             startService(Intent(this, PetService::class.java).setAction(PetService.ACTION_REFRESH))
         }
         finish()
-    }
-
-    private fun confirmDelete() {
-        AlertDialog.Builder(this)
-            .setTitle("¿Eliminar a ${look.name}?")
-            .setMessage("Se borra de la lista. No se puede deshacer.")
-            .setPositiveButton("Eliminar") { _, _ ->
-                CatStore.remove(this, catId)
-                if (PetService.running) {
-                    startService(Intent(this, PetService::class.java).setAction(PetService.ACTION_REFRESH))
-                }
-                finish()
-            }
-            .setNegativeButton("Cancelar", null)
-            .show()
     }
 
     override fun onResume() {
