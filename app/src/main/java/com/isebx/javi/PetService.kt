@@ -68,6 +68,7 @@ class PetService : Service() {
     private val handler = Handler(Looper.getMainLooper())
 
     private val javi = Javi()
+    private val look = CatLook.javi()
     private var view: PetView? = null
     private var lp: WindowManager.LayoutParams? = null
 
@@ -198,7 +199,7 @@ class PetService : Service() {
         unit = resources.displayMetrics.density * Store.size(this)
         Care.load(this)
         javi.dirt = Care.dirt
-        javi.collar = Store.collar(this)
+        look.collar = Store.collar(this)
         sensors = getSystemService(Context.SENSOR_SERVICE) as? SensorManager
         accel = sensors?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
         measure()
@@ -228,7 +229,10 @@ class PetService : Service() {
                 Care.loved(0.03f)
             }
             ACTION_PLAY -> throwYarn()
-            ACTION_REFRESH -> javi.collar = Store.collar(this)
+            ACTION_REFRESH -> {
+                look.collar = Store.collar(this)
+                view?.invalidate()
+            }
             ACTION_STOP -> stopSelf()
         }
         return START_STICKY
@@ -331,7 +335,7 @@ class PetService : Service() {
 
     @SuppressLint("ClickableViewAccessibility")
     private fun addWindow() {
-        val v = PetView(this, javi, unit, true)
+        val v = PetView(this, javi, unit, true, look)
         val params = overlayParams(
             (Javi.HALF_W * 2f * unit).toInt(),
             ((Javi.TOP + Javi.BOTTOM) * unit).toInt()
@@ -1069,7 +1073,7 @@ class PetService : Service() {
         yarn.active = false
         perchRect = null
         javi.startBath()
-        val b = BathView(this, javi, resources.displayMetrics.density)
+        val b = BathView(this, javi, look, resources.displayMetrics.density)
         b.onExit = { handler.post { endBath() } }
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,

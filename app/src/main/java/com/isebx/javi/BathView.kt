@@ -18,7 +18,12 @@ import kotlin.random.Random
  * y una ducha para enjuagarlo.
  */
 @SuppressLint("ViewConstructor")
-class BathView(context: Context, private val javi: Javi, private val d: Float) : View(context) {
+class BathView(
+    context: Context,
+    private val javi: Javi,
+    private val look: CatLook,
+    private val d: Float
+) : View(context) {
 
     companion object {
         private const val TOOL_BRUSH = 0
@@ -33,7 +38,8 @@ class BathView(context: Context, private val javi: Javi, private val d: Float) :
     var wet = 0f
         private set
 
-    private val painter = JaviPainter()
+    private val painter = CatPainter()
+    private val pen = AndroidPen()
     private var tool = TOOL_BRUSH
     private val dirt0 = javi.dirt
 
@@ -171,7 +177,8 @@ class BathView(context: Context, private val javi: Javi, private val d: Float) :
         canvas.save()
         canvas.translate(ox, oy)
         canvas.scale(k, k)
-        painter.draw(canvas, javi)
+        pen.canvas = canvas
+        painter.draw(pen, javi, look)
 
         // Espuma
         for (i in 0 until foam) {

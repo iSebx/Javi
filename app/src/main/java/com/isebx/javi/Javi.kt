@@ -201,9 +201,6 @@ class Javi {
     /** Estornudo: el soplidito (0 a 1). */
     var puff = 0f; private set
 
-    /** Color del collar (ARGB), o 0 si no lleva. El negro es en su recuerdo. */
-    var collar = 0
-
     /** Qué tan sucio se ve (0 a 1). Lo pone quien lo cuida. */
     var dirt = 0f
 
@@ -304,6 +301,11 @@ class Javi {
             St.CLIMB -> 9f
             St.HELD, St.FALL, St.SLIDE, St.BATH -> 99999f
         }
+    }
+
+    /** Solo para las pruebas de dibujo: pone un estado a mano. */
+    fun debugSet(n: St) {
+        set(n)
     }
 
     fun pet() {

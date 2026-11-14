@@ -1,22 +1,26 @@
 package com.isebx.javi
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Canvas
 import android.view.View
 
 /**
- * Vista que dibuja a Javi.
- * follow = true: la ventana lo sigue (overlay), Javi queda centrado.
- * follow = false: Javi camina dentro de la vista (vista previa en la app).
+ * Vista que dibuja a un gato.
+ * follow = true: la ventana lo sigue (overlay), el gato queda centrado.
+ * follow = false: el gato camina dentro de la vista (vista previa en la app).
  */
+@SuppressLint("ViewConstructor")
 class PetView(
     context: Context,
     val javi: Javi,
     val unit: Float,
-    private val follow: Boolean
+    private val follow: Boolean,
+    var look: CatLook
 ) : View(context) {
 
-    private val painter = JaviPainter()
+    private val painter = CatPainter()
+    private val pen = AndroidPen()
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
@@ -27,7 +31,8 @@ class PetView(
             canvas.translate(javi.x * unit, height - 14f * unit - javi.alt * unit)
         }
         canvas.scale(unit, unit)
-        painter.draw(canvas, javi)
+        pen.canvas = canvas
+        painter.draw(pen, javi, look)
         canvas.restore()
     }
 }

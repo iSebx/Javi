@@ -27,6 +27,7 @@ import kotlin.math.min
 class MainActivity : Activity() {
 
     private val javi = Javi()
+    private val look = CatLook.javi()
     private lateinit var preview: PetView
     private lateinit var toggle: Button
     private lateinit var info: TextView
@@ -83,7 +84,7 @@ class MainActivity : Activity() {
         })
 
         val unit = resources.displayMetrics.density * 1.05f
-        preview = PetView(this, javi, unit, false)
+        preview = PetView(this, javi, unit, false, look)
         root.addView(
             preview,
             LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f)
@@ -225,7 +226,7 @@ class MainActivity : Activity() {
     @SuppressLint("SetTextI18n")
     private fun refresh() {
         toggle.text = if (PetService.running) "Guardar a Javi" else "Sacar a Javi a la pantalla"
-        javi.collar = Store.collar(this)
+        look.collar = Store.collar(this)
         collarBtn.text = "Collar: " + Store.COLLAR_NAMES[Store.collarIndex(this)]
         Care.load(this)
         info.text = "${Care.mood}\n" +
