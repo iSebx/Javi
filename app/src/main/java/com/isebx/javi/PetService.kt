@@ -223,6 +223,7 @@ class PetService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        Diag.install(this)
         wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         goForeground()
         if (!Settings.canDrawOverlays(this)) {
@@ -542,6 +543,7 @@ class PetService : Service() {
             wm.addView(v, params)
         } catch (e: Exception) {
             p.view = null
+            Diag.note(this, "No se pudo poner a ${p.look.name} en pantalla", e)
         }
     }
 

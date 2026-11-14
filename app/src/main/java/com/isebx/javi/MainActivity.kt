@@ -52,6 +52,7 @@ class MainActivity : Activity() {
     @SuppressLint("ClickableViewAccessibility", "SetTextI18n")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Diag.install(this)
         val brown = 0xFF5A4332.toInt()
         val bg = 0xFFFBF3E7.toInt()
         window.statusBarColor = bg
@@ -204,6 +205,7 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         refresh()
+        Diag.show(this)
         looping = true
         lastNs = 0L
         Choreographer.getInstance().postFrameCallback(frame)
