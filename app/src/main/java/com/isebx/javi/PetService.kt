@@ -54,6 +54,7 @@ class PetService : Service() {
         const val ACTION_PET = "com.isebx.javi.PET"
         const val ACTION_PLAY = "com.isebx.javi.PLAY"
         const val ACTION_STOP = "com.isebx.javi.STOP"
+        const val ACTION_REFRESH = "com.isebx.javi.REFRESH"
         const val EXTRA_KIND = "kind"
         private const val CHANNEL = "javi"
 
@@ -197,6 +198,7 @@ class PetService : Service() {
         unit = resources.displayMetrics.density * Store.size(this)
         Care.load(this)
         javi.dirt = Care.dirt
+        javi.collar = Store.collar(this)
         sensors = getSystemService(Context.SENSOR_SERVICE) as? SensorManager
         accel = sensors?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
         measure()
@@ -226,6 +228,7 @@ class PetService : Service() {
                 Care.loved(0.03f)
             }
             ACTION_PLAY -> throwYarn()
+            ACTION_REFRESH -> javi.collar = Store.collar(this)
             ACTION_STOP -> stopSelf()
         }
         return START_STICKY

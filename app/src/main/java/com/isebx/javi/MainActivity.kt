@@ -31,6 +31,7 @@ class MainActivity : Activity() {
     private lateinit var toggle: Button
     private lateinit var info: TextView
     private lateinit var eyes: Button
+    private lateinit var collarBtn: Button
     private var lastNs = 0L
     private var looping = false
 
@@ -155,6 +156,23 @@ class MainActivity : Activity() {
             ).apply { topMargin = dp(12) }
         )
 
+        collarBtn = Button(this).apply {
+            setAllCaps(false)
+            textSize = 14f
+            setOnClickListener {
+                Store.setCollar(this@MainActivity, !Store.collar(this@MainActivity))
+                send(PetService.ACTION_REFRESH)
+                refresh()
+            }
+        }
+        root.addView(
+            collarBtn,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        )
+
         eyes = Button(this).apply {
             setAllCaps(false)
             textSize = 14f
@@ -202,6 +220,8 @@ class MainActivity : Activity() {
     @SuppressLint("SetTextI18n")
     private fun refresh() {
         toggle.text = if (PetService.running) "Guardar a Javi" else "Sacar a Javi a la pantalla"
+        javi.collar = Store.collar(this)
+        collarBtn.text = if (javi.collar) "Collar negro: puesto" else "Collar negro: sin collar"
         Care.load(this)
         info.text = "${Care.mood}\n" +
             "Comida ${(Care.food * 100).toInt()}%  ·  Diversión ${(Care.play * 100).toInt()}%  ·  " +

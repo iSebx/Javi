@@ -28,6 +28,13 @@ object Store {
         prefs(c).edit().putInt("regalos", regalos(c) + 1).apply()
     }
 
+    /** Collar negro en recuerdo. Viene puesto. */
+    fun collar(c: Context): Boolean = prefs(c).getBoolean("collar", true)
+
+    fun setCollar(c: Context, on: Boolean) {
+        prefs(c).edit().putBoolean("collar", on).apply()
+    }
+
     const val SIZE_MIN = 0.35f
     const val SIZE_MAX = 0.95f
     const val SIZE_STEP = 0.07f
