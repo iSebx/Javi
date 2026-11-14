@@ -10,12 +10,10 @@ object Looks {
     private const val OR = 0xFFE39A4E.toInt()
     private const val WH = CatLook.WHITE
 
-    private fun patch(part: Int, x: Float, y: Float, rx: Float, ry: Float, c: Int) =
-        CatLook.Patch(part, x, y, rx, ry, c)
-
     private fun look(name: String, f: CatLook.() -> Unit): CatLook = CatLook().apply {
         this.name = name
         f()
+        rebuildPatches()
     }
 
     fun presets(): List<CatLook> = listOf(
@@ -43,31 +41,17 @@ object Looks {
         look("Vaquita") {
             base = WH; dark = 0xFFE6DFD2.toInt(); light = WH; tail = CatLook.T_BOB
             eyeL = 0xFFE6C34A.toInt(); eyeR = eyeL; whiskers = 0xFFD9D2C6.toInt()
-            patches = listOf(
-                patch(0, -22f, -66f, 16f, 13f, BK), patch(0, 12f, -52f, 14f, 11f, BK),
-                patch(0, -8f, -36f, 10f, 8f, BK),
-                patch(1, -18f, -16f, 20f, 18f, BK), patch(1, 26f, -18f, 14f, 14f, BK)
-            )
+            patchStyle = CatLook.P_COW; patchA = BK
         },
         look("Calicó") {
             base = WH; dark = 0xFFE6DFD2.toInt(); light = WH; tailTip = false
             eyeL = 0xFF7FB069.toInt(); eyeR = eyeL; whiskers = 0xFFD9D2C6.toInt()
-            patches = listOf(
-                patch(0, -24f, -66f, 17f, 13f, BK), patch(0, 6f, -70f, 15f, 11f, OR),
-                patch(0, -6f, -42f, 13f, 10f, OR), patch(0, 22f, -52f, 11f, 10f, BK),
-                patch(1, -18f, -14f, 22f, 20f, OR), patch(1, 24f, -20f, 16f, 16f, BK)
-            )
+            patchStyle = CatLook.P_CALICO; patchA = BK; patchB = OR
         },
         look("Carey") {
             base = 0xFF34302F.toInt(); dark = 0xFF2A2627.toInt(); light = 0xFF4A4442.toInt()
             innerEar = 0xFF7A6460.toInt(); blush = false
-            patches = listOf(
-                patch(0, -26f, -62f, 10f, 8f, 0xFFD98A42.toInt()), patch(0, -6f, -74f, 9f, 7f, 0xFFE9B06A.toInt()),
-                patch(0, 10f, -56f, 11f, 8f, 0xFFD98A42.toInt()), patch(0, -12f, -44f, 8f, 7f, 0xFFE9B06A.toInt()),
-                patch(0, 24f, -68f, 8f, 7f, 0xFFD98A42.toInt()),
-                patch(1, -16f, -10f, 12f, 14f, 0xFFD98A42.toInt()), patch(1, 20f, 10f, 10f, 9f, 0xFFE9B06A.toInt()),
-                patch(1, 8f, -24f, 8f, 6f, 0xFFD98A42.toInt())
-            )
+            patchStyle = CatLook.P_TORTIE; patchA = 0xFFD98A42.toInt(); patchB = 0xFFE9B06A.toInt()
         },
         look("Siamés") {
             base = 0xFFF3E6D2.toInt(); dark = 0xFFE4D6BF.toInt(); light = 0xFFF9F0E2.toInt()

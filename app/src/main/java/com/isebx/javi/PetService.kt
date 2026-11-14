@@ -68,7 +68,7 @@ class PetService : Service() {
     private val handler = Handler(Looper.getMainLooper())
 
     private val javi = Javi()
-    private val look = CatLook.javi()
+    private var look = CatLook.javi()
     private var view: PetView? = null
     private var lp: WindowManager.LayoutParams? = null
 
@@ -191,6 +191,7 @@ class PetService : Service() {
     override fun onCreate() {
         super.onCreate()
         wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        look = CatStore.active(this).look
         goForeground()
         if (!Settings.canDrawOverlays(this)) {
             stopSelf()
@@ -199,7 +200,7 @@ class PetService : Service() {
         unit = resources.displayMetrics.density * Store.size(this)
         Care.load(this)
         javi.dirt = Care.dirt
-        look.collar = Store.collar(this)
+        look = CatStore.active(this).look
         sensors = getSystemService(Context.SENSOR_SERVICE) as? SensorManager
         accel = sensors?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
         measure()
@@ -230,7 +231,9 @@ class PetService : Service() {
             }
             ACTION_PLAY -> throwYarn()
             ACTION_REFRESH -> {
-                look.collar = Store.collar(this)
+                // Cambió el gato elegido o su aspecto
+                look = CatStore.active(this).look
+                view?.look = look
                 view?.invalidate()
             }
             ACTION_STOP -> stopSelf()
@@ -1128,7 +1131,7 @@ class PetService : Service() {
         )
         val n = Notification.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_paw)
-            .setContentTitle("Javi está con vos")
+            .setContentTitle("${look.name} está con vos")
             .setContentText("Tocá para abrir su casita")
             .setContentIntent(open)
             .setOngoing(true)

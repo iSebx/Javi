@@ -27,12 +27,12 @@ import kotlin.math.min
 class MainActivity : Activity() {
 
     private val javi = Javi()
-    private val look = CatLook.javi()
+    private var look = CatLook.javi()
+    private lateinit var titleView: TextView
     private lateinit var preview: PetView
     private lateinit var toggle: Button
     private lateinit var info: TextView
     private lateinit var eyes: Button
-    private lateinit var collarBtn: Button
     private var lastNs = 0L
     private var looping = false
 
@@ -68,13 +68,14 @@ class MainActivity : Activity() {
             fitsSystemWindows = true
         }
 
-        root.addView(TextView(this).apply {
+        titleView = TextView(this).apply {
             text = "Javi"
             textSize = 34f
             setTextColor(brown)
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             gravity = Gravity.CENTER
-        })
+        }
+        root.addView(titleView)
         root.addView(TextView(this).apply {
             text = "Mantenelo apretado para ver sus acciones. Acarici\u00e1lo de lado a lado. Soltalo sobre un \u00edcono y se cuelga."
             textSize = 15f
@@ -157,22 +158,13 @@ class MainActivity : Activity() {
             ).apply { topMargin = dp(12) }
         )
 
-        collarBtn = Button(this).apply {
-            setAllCaps(false)
-            textSize = 14f
-            setOnClickListener {
-                AlertDialog.Builder(this@MainActivity)
-                    .setTitle("Collar")
-                    .setItems(Store.COLLAR_NAMES) { _, i ->
-                        Store.setCollarIndex(this@MainActivity, i)
-                        send(PetService.ACTION_REFRESH)
-                        refresh()
-                    }
-                    .show()
-            }
-        }
         root.addView(
-            collarBtn,
+            Button(this).apply {
+                setAllCaps(false)
+                textSize = 15f
+                text = "Mis gatos"
+                setOnClickListener { startActivity(Intent(this@MainActivity, CatsActivity::class.java)) }
+            },
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
@@ -226,8 +218,9 @@ class MainActivity : Activity() {
     @SuppressLint("SetTextI18n")
     private fun refresh() {
         toggle.text = if (PetService.running) "Guardar a Javi" else "Sacar a Javi a la pantalla"
-        look.collar = Store.collar(this)
-        collarBtn.text = "Collar: " + Store.COLLAR_NAMES[Store.collarIndex(this)]
+        look = CatStore.active(this).look
+        preview.look = look
+        titleView.text = look.name
         Care.load(this)
         info.text = "${Care.mood}\n" +
             "Comida ${(Care.food * 100).toInt()}%  ·  Diversión ${(Care.play * 100).toInt()}%  ·  " +

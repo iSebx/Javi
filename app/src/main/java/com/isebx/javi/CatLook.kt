@@ -49,6 +49,12 @@ class CatLook {
         const val T_BOB = 3
         const val T_NONE = 4
 
+        // Manchas
+        const val P_NONE = 0
+        const val P_COW = 1
+        const val P_CALICO = 2
+        const val P_TORTIE = 3
+
         const val WHITE = 0xFFFBF6EE.toInt()
 
         fun mix(a: Int, b: Int, t: Float): Int {
@@ -96,7 +102,55 @@ class CatLook {
 
     /** Color de las puntas (cara, orejas, patas, cola) si es colorpoint; 0 si no. */
     var point = 0
+
+    /** Manchas: 0 ninguna, 1 vaquita, 2 calicó, 3 carey. Con sus dos colores. */
+    var patchStyle = P_NONE
+    var patchA = 0xFF3A3536.toInt()
+    var patchB = 0xFFE39A4E.toInt()
     var patches: List<Patch> = emptyList()
+        private set
+
+    /** Vuelve a armar las manchas según el estilo y los colores elegidos. */
+    fun rebuildPatches() {
+        patches = when (patchStyle) {
+            P_COW -> listOf(
+                Patch(0, -22f, -66f, 16f, 13f, patchA), Patch(0, 12f, -52f, 14f, 11f, patchA),
+                Patch(0, -8f, -36f, 10f, 8f, patchA),
+                Patch(1, -18f, -16f, 20f, 18f, patchA), Patch(1, 26f, -18f, 14f, 14f, patchA)
+            )
+            P_CALICO -> listOf(
+                Patch(0, -24f, -66f, 17f, 13f, patchA), Patch(0, 6f, -70f, 15f, 11f, patchB),
+                Patch(0, -6f, -42f, 13f, 10f, patchB), Patch(0, 22f, -52f, 11f, 10f, patchA),
+                Patch(1, -18f, -14f, 22f, 20f, patchB), Patch(1, 24f, -20f, 16f, 16f, patchA)
+            )
+            P_TORTIE -> listOf(
+                Patch(0, -26f, -62f, 10f, 8f, patchA), Patch(0, -6f, -74f, 9f, 7f, patchB),
+                Patch(0, 10f, -56f, 11f, 8f, patchA), Patch(0, -12f, -44f, 8f, 7f, patchB),
+                Patch(0, 24f, -68f, 8f, 7f, patchA),
+                Patch(1, -16f, -10f, 12f, 14f, patchA), Patch(1, 20f, 10f, 10f, 9f, patchB),
+                Patch(1, 8f, -24f, 8f, 6f, patchA)
+            )
+            else -> emptyList()
+        }
+    }
+
+    /** Deriva los tonos de marcas y de panza a partir del color base. */
+    fun autoShades() {
+        dark = darken(base, 0.8f)
+        light = mix(base, WHITE, 0.6f)
+    }
+
+    fun copy(): CatLook {
+        val o = CatLook()
+        o.name = name; o.base = base; o.dark = dark; o.light = light; o.pattern = pattern
+        o.white = white; o.point = point; o.patchStyle = patchStyle; o.patchA = patchA; o.patchB = patchB
+        o.hair = hair; o.head = head; o.ears = ears; o.tail = tail; o.tailTip = tailTip
+        o.bodyW = bodyW; o.bodyL = bodyL; o.headSize = headSize
+        o.eyeL = eyeL; o.eyeR = eyeR; o.nose = nose; o.innerEar = innerEar; o.whiskers = whiskers
+        o.blush = blush; o.collar = collar
+        o.rebuildPatches()
+        return o
+    }
 
     var hair = SHORT
     var head = ROUND
