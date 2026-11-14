@@ -86,6 +86,15 @@ class PetService : Service() {
 
     private var wand: WandView? = null
 
+    private var stats: StatsView? = null
+    private var careAcc = 0f
+    private var saveAcc = 0f
+
+    private var poopView: PoopView? = null
+    private var poopX = 0f
+    private var poopAge = 0f
+    private var poopNagged = false
+
     private var wheel: WheelView? = null
     private var bath: BathView? = null
     private var menuLevel = MENU_MAIN
@@ -115,6 +124,7 @@ class PetService : Service() {
             stepIcons(dt)
             stepFly(dt)
             stepGift(dt)
+            stepCare(dt)
             wand?.let {
                 it.step(dt)
                 javi.attend(it.tipX / unit, (floorY - it.tipY) / unit, maxClimb(), true, true, true)
@@ -165,6 +175,8 @@ class PetService : Service() {
                     sensors?.unregisterListener(shake)
                     endBath()
                     endWand()
+                    closeStats()
+                    Care.save(this@PetService)
                     closeMenu()
                 }
                 Intent.ACTION_SCREEN_ON -> resumeLoop()
@@ -183,6 +195,8 @@ class PetService : Service() {
             return
         }
         unit = resources.displayMetrics.density * Store.size(this)
+        Care.load(this)
+        javi.dirt = Care.dirt
         sensors = getSystemService(Context.SENSOR_SERVICE) as? SensorManager
         accel = sensors?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
         measure()
@@ -204,10 +218,13 @@ class PetService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
-            ACTION_FEED -> javi.feed(
+            ACTION_FEED -> feed(
                 (intent?.getIntExtra(EXTRA_KIND, Props.POLLO) ?: Props.POLLO).coerceIn(0, Props.AGUA)
             )
-            ACTION_PET -> javi.pet()
+            ACTION_PET -> {
+                javi.pet()
+                Care.loved(0.03f)
+            }
             ACTION_PLAY -> throwYarn()
             ACTION_STOP -> stopSelf()
         }
@@ -239,7 +256,10 @@ class PetService : Service() {
         closeMenu()
         endBath()
         endWand()
+        closeStats()
         removeGift()
+        removePoop()
+        Care.save(this)
         removeYarnWindow()
         removeFlyWindow()
         removeQuietly(view)
@@ -369,9 +389,11 @@ class PetService : Service() {
                         if (javi.alt > 70f) release(e.rawX, e.rawY) else javi.drop()
                     } else if (rubbing) {
                         rubbing = false
+                        Care.loved(0.05f)
                     } else if (!longFired && e.actionMasked == MotionEvent.ACTION_UP) {
                         javi.pet()
                         Store.addMimo(this)
+                        Care.loved(0.03f)
                     }
                     dragging = false
                 }
@@ -415,6 +437,7 @@ class PetService : Service() {
         fly.active = false
         removeFlyWindow()
         removeGift()
+        removePoop()
         removeQuietly(view)
         view = null
         javi.x = javi.x * old / next
@@ -611,6 +634,7 @@ class PetService : Service() {
                 if (!kicked && abs(yarn.x - javi.x) < 65f && yarn.alt < 85f) {
                     yarn.kick(javi.dir)
                     kicked = true
+                    Care.played(0.05f)
                 }
             } else {
                 kicked = false
@@ -669,9 +693,10 @@ class PetService : Service() {
         when (level) {
             MENU_MAIN -> w.show(
                 intArrayOf(
-                    Props.POLLO, Props.AGUA, Props.YARN, Props.SHOWER, Props.SIZE, Props.HOME
+                    Props.POLLO, Props.AGUA, Props.YARN, Props.SHOWER, Props.STATS,
+                    Props.SIZE, Props.HOME
                 ),
-                arrayOf("Comer", "Agua", "Jugar", "Bañar", "Tamaño", "A casa")
+                arrayOf("Comer", "Agua", "Jugar", "Bañar", "Cómo está", "Tamaño", "A casa")
             )
             MENU_FOOD -> w.show(
                 intArrayOf(Props.POLLO, Props.CARNE, Props.PESCADO, Props.LECHE, Props.ZAPALLO),
@@ -694,15 +719,19 @@ class PetService : Service() {
                 0 -> showLevel(MENU_FOOD)
                 1 -> {
                     closeMenu()
-                    javi.feed(Props.AGUA)
+                    feed(Props.AGUA)
                 }
                 2 -> showLevel(MENU_PLAY)
                 3 -> {
                     closeMenu()
                     startBath()
                 }
-                4 -> showLevel(MENU_SIZE)
-                5 -> {
+                4 -> {
+                    closeMenu()
+                    openStats()
+                }
+                5 -> showLevel(MENU_SIZE)
+                6 -> {
                     closeMenu()
                     yarn.active = false
                     javi.leave()
@@ -710,7 +739,7 @@ class PetService : Service() {
             }
             MENU_FOOD -> {
                 closeMenu()
-                javi.feed(i)
+                feed(i)
                 Store.addComida(this)
             }
             MENU_PLAY -> {
@@ -832,6 +861,118 @@ class PetService : Service() {
         v.invalidate()
     }
 
+    // ---------- Cuidado: comida, diversión, limpieza y caca ----------
+
+    private fun feed(kind: Int) {
+        javi.feed(kind)
+        if (kind == Props.AGUA) Care.drink() else Care.feed(kind == Props.LECHE)
+    }
+
+    private val quiet: Boolean
+        get() = wheel == null && bath == null && wand == null && stats == null
+
+    @SuppressLint("ClickableViewAccessibility")
+    private fun stepCare(dt: Float) {
+        careAcc += dt
+        if (careAcc >= 1f) {
+            Care.tick(careAcc)
+            Care.tickAwake(careAcc)
+            careAcc = 0f
+            if (bath == null) javi.dirt = Care.dirt
+            javi.needs = Care.want
+            stats?.invalidate()
+        }
+        saveAcc += dt
+        if (saveAcc >= 30f) {
+            saveAcc = 0f
+            Care.save(this)
+        }
+        if (javi.takeGroomed()) Care.groomed()
+        if (javi.swatting || wand != null) Care.played(dt * 0.012f)
+
+        // Hora de hacer caca
+        if (Care.poopDue && poopView == null && quiet && !yarn.active && !fly.active) {
+            if (javi.startPoop()) Care.pooped()
+        }
+        when (javi.takePoopEvent()) {
+            1 -> {
+                // Acaba de hacer y ya se dio vuelta: queda delante suyo
+                poopX = javi.x + javi.dir * 46f
+                val v = PoopView(this, unit)
+                val side = (PoopView.HALF * 2f * unit).toInt()
+                val params = overlayParams(side, side)
+                params.x = ((poopX - PoopView.HALF) * unit).toInt()
+                params.y = floorY - side
+                v.setOnTouchListener { _, e ->
+                    if (e.actionMasked == MotionEvent.ACTION_UP) {
+                        Care.poopCleaned()
+                        removePoop()
+                        javi.pet()
+                    }
+                    true
+                }
+                try {
+                    wm.addView(v, params)
+                    poopView = v
+                    poopAge = 0f
+                    poopNagged = false
+                } catch (e: Exception) {
+                    poopView = null
+                }
+            }
+            2 -> poopView?.let {
+                it.covered = 1f
+                it.invalidate()
+            }
+        }
+        val pv = poopView ?: return
+        if (javi.st == Javi.St.COVER) {
+            pv.covered = javi.coverProgress
+            pv.invalidate()
+        }
+        poopAge += dt
+        // Si pasa mucho sin juntarla, va, la huele y te mira
+        if (!poopNagged && poopAge > 300f && javi.idle && quiet) {
+            poopNagged = true
+            Care.poopLeft()
+            javi.goTo(poopX - 50f, Javi.St.BEG)
+        }
+    }
+
+    private fun removePoop() {
+        removeQuietly(poopView)
+        poopView = null
+    }
+
+    private fun openStats() {
+        if (stats != null) return
+        val v = StatsView(this, resources.displayMetrics.density)
+        v.onExit = { handler.post { closeStats() } }
+        val params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                WindowManager.LayoutParams.FLAG_DIM_BEHIND,
+            PixelFormat.TRANSLUCENT
+        )
+        params.dimAmount = 0.5f
+        params.gravity = Gravity.TOP or Gravity.START
+        try {
+            wm.addView(v, params)
+            stats = v
+        } catch (e: Exception) {
+            stats = null
+        }
+    }
+
+    private fun closeStats() {
+        removeQuietly(stats)
+        stats = null
+    }
+
     // ---------- Regalito ----------
 
     /** Cada tanto Javi trae una flor y la deja en el piso; se toca para aceptarla. */
@@ -865,7 +1006,8 @@ class PetService : Service() {
         }
         giftTimer -= dt
         if (giftTimer <= 0f) {
-            giftTimer = 180f + Random.nextFloat() * 240f
+            // Si está bien cuidado, trae regalitos más seguido
+            giftTimer = (180f + Random.nextFloat() * 240f) * (if (Care.happy) 0.6f else 1f)
             if (javi.idle && giftView == null && !yarn.active && !fly.active &&
                 wheel == null && bath == null && wand == null
             ) {
@@ -954,6 +1096,8 @@ class PetService : Service() {
     private fun endBath() {
         val b = bath ?: return
         bath = null
+        Care.bathed(b.quality)
+        javi.dirt = Care.dirt
         removeQuietly(b)
         view?.visibility = View.VISIBLE
         javi.endBath()

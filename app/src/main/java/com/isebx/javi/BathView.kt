@@ -35,6 +35,12 @@ class BathView(context: Context, private val javi: Javi, private val d: Float) :
 
     private val painter = JaviPainter()
     private var tool = TOOL_BRUSH
+    private val dirt0 = javi.dirt
+
+    /** Qué tan bien quedó bañado: 1 = enjabonado y enjuagado del todo. */
+    val quality: Float
+        get() = if (soaped && foam == 0 && wet > 0.35f) 1f
+        else (wet * 0.3f + (if (soaped) 0.2f else 0f)).coerceIn(0f, 0.9f)
     private var time = 0f
 
     // Espuma, en unidades de Javi
@@ -155,6 +161,7 @@ class BathView(context: Context, private val javi: Javi, private val d: Float) :
             i++
         }
         javi.wet = wet
+        javi.dirt = dirt0 * (1f - (if (soaped) wet else wet * 0.3f)).coerceIn(0f, 1f)
     }
 
     override fun onDraw(canvas: Canvas) {

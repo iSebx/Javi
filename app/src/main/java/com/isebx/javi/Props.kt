@@ -26,6 +26,7 @@ object Props {
     const val WAND = 17
     const val BOX = 18
     const val FLOWER = 19
+    const val STATS = 20
 
     val FOOD_NAMES = arrayOf("Pollo", "Carnecita", "Pescado", "Leche", "Zapallo")
 
@@ -156,6 +157,11 @@ object Props {
                 c.drawCircle(0f, -23f, 3.4f, f(0xFFEF9DB0.toInt()))
                 c.drawCircle(0f, -15.5f, 3.4f, f(0xFFEF9DB0.toInt()))
                 c.drawCircle(0f, -19f, 2.6f, f(0xFFFFE27A.toInt()))
+            }
+            STATS -> {
+                c.drawRoundRect(-11f, 2f, -5f, 10f, 1.5f, 1.5f, f(0xFFE8893A.toInt()))
+                c.drawRoundRect(-3f, -4f, 3f, 10f, 1.5f, 1.5f, f(0xFFD9627A.toInt()))
+                c.drawRoundRect(5f, -10f, 11f, 10f, 1.5f, 1.5f, f(0xFF6FA8DC.toInt()))
             }
             BRUSH -> {
                 c.drawRoundRect(-12f, -9f, 12f, -2f, 3f, 3f, f(0xFFB9794A.toInt()))

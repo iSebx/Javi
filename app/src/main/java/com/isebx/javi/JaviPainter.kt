@@ -306,6 +306,16 @@ class JaviPainter {
         c.drawPath(bodyStripes, stroke)
         fill.color = cream
         c.drawOval(11f + sx * 0.9f, -50f, 37f + sx * 0.9f, -22f, fill)
+        if (j.dirt > 0.05f) {
+            // Manchitas de tierra
+            fill.color = 0xFF8A6A4A.toInt()
+            fill.alpha = (j.dirt.coerceIn(0f, 1f) * 150).toInt()
+            c.drawOval(-27f, -49f, -15f, -41f, fill)
+            c.drawOval(-7f, -38f, 4f, -30f, fill)
+            c.drawOval(11f, -62f, 21f, -55f, fill)
+            c.drawOval(-16f, -66f, -8f, -60f, fill)
+            fill.alpha = 255
+        }
         c.restore()
 
         // Cabeza
@@ -443,6 +453,43 @@ class JaviPainter {
                 )
             }
             fill.alpha = 255
+        }
+
+        // Una mosquita cuando está muy sucio
+        if (j.dirt > 0.6f) {
+            val fx = j.dir * 6f + kotlin.math.cos(j.time * 3.1f) * 34f
+            val fy = -118f + kotlin.math.sin(j.time * 5.3f) * 12f
+            fill.color = 0xFFFFFFFF.toInt()
+            fill.alpha = 170
+            c.drawOval(fx - 4f, fy - 3.5f, fx, fy - 0.5f, fill)
+            c.drawOval(fx, fy - 3.5f, fx + 4f, fy - 0.5f, fill)
+            fill.color = 0xFF3A2418.toInt()
+            fill.alpha = 255
+            c.drawCircle(fx, fy, 1.8f, fill)
+        }
+
+        // Globito con lo que pide
+        if (j.want != 0) {
+            val bx = j.dir * 44f
+            fill.color = 0xFFFFFFFF.toInt()
+            c.drawCircle(j.dir * 30f, -128f, 3f, fill)
+            c.drawCircle(j.dir * 36f, -137f, 4.5f, fill)
+            c.drawCircle(bx, -155f, 16f, fill)
+            stroke.strokeWidth = 1.2f
+            stroke.color = 0xFF5A4332.toInt()
+            c.drawCircle(bx, -155f, 16f, stroke)
+            c.save()
+            c.translate(bx, -155f)
+            c.scale(0.85f, 0.85f)
+            Props.draw(
+                c,
+                when (j.want) {
+                    1 -> Props.POLLO
+                    2 -> Props.YARN
+                    else -> Props.SHOWER
+                }
+            )
+            c.restore()
         }
 
         // Corazones

@@ -11,8 +11,8 @@ android {
         applicationId = "com.isebx.javi"
         minSdk = 26
         targetSdk = 34
-        versionCode = 10
-        versionName = "0.10"
+        versionCode = 11
+        versionName = "0.11"
     }
 
     // "base": la versión normal. "iconos": suma el servicio de accesibilidad

@@ -59,7 +59,7 @@ class WheelView(context: Context, private val d: Float) : View(context) {
         val n = icons.size
         if (n == 0) return
         val wide = n >= 6
-        radius = (if (wide) 126f else 118f) * d
+        radius = (if (n >= 7) 142f else if (wide) 126f else 118f) * d
         val margin = radius + item + 4f * d
         var ccx = cx
         if (width > 0) {

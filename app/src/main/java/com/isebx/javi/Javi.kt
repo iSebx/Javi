@@ -20,7 +20,7 @@ class Javi {
         WALK, CHASE, SIT, GROOM, STRETCH, SLEEP, PURR, POUNCE, EAT, BEG, RUB,
         HELD, FALL, JUMPTO, PERCH, HANG, SLIDE, CLING, BATH, SHAKE,
         WATCH, REACH, CLIMB,
-        KNEAD, YAWN, SNEEZE, WASH, DROP, BOX, STARE, SWAT
+        KNEAD, YAWN, SNEEZE, WASH, DROP, BOX, STARE, SWAT, POOP, COVER
     }
 
     companion object {
@@ -70,6 +70,7 @@ class Javi {
         private val P_RUB = floatArrayOf(0f, 0f, 0f, 0f, -4f, 0f, 20f, 36f, -70f, 78f, 3f, 1f, 1f, 1f, 0.08f, 0f)
         private val P_WATCH = floatArrayOf(-85f, -85f, 49f, 49f, -55f, 21f, 0f, 9f, -86f, -30f, 14f, 1.48f, 1.31f, 1f, 1.15f, 0f)
         private val P_REACH = floatArrayOf(12f, 4f, -102f, -102f, -74f, 0f, 0f, 24f, -84f, 20f, 4f, 1.9f, 2.25f, 1f, 1.15f, 0f)
+        private val P_POOP = floatArrayOf(-48f, -48f, 22f, 22f, -22f, 10f, 2f, 30f, -80f, 80f, 0f, 1.2f, 1.12f, 1f, 0.5f, 0f)
         private val P_KNEAD = floatArrayOf(0f, 0f, -12f, -12f, 9f, 0f, 16f, 42f, -58f, 50f, 6f, 0.88f, 0.9f, 1f, 0.25f, 0f)
         private val P_BOX = floatArrayOf(-85f, -85f, 49f, 49f, -55f, 21f, 0f, 9f, -86f, 70f, 10f, 1.48f, 1.31f, 1f, 1.15f, 0f)
         private val P_STARE = floatArrayOf(-85f, -85f, 49f, 49f, -55f, 21f, 6f, 9f, -86f, -30f, 14f, 1.48f, 1.31f, 1f, 1.25f, 0f)
@@ -147,6 +148,10 @@ class Javi {
     private var boxT = 0f
     private var carrying = false
     private var giftReady = false
+    private var poopEvent = 0
+    private var groomedFlag = false
+    private var wantVar = 0
+    private var wCover = 0f
     private var flyQuick = false
     private var flyReach = true
     private var flyFollow = true
@@ -195,6 +200,15 @@ class Javi {
 
     /** Estornudo: el soplidito (0 a 1). */
     var puff = 0f; private set
+
+    /** Qué tan sucio se ve (0 a 1). Lo pone quien lo cuida. */
+    var dirt = 0f
+
+    /** Lo que le está faltando (ver Care.WANT_*). Lo pone quien lo cuida. */
+    var needs = 0
+
+    /** Lo que está pidiendo ahora mismo, para dibujar el globito. */
+    var want = 0; private set
 
     /** Lleva un regalito en la boca. */
     var carry = false; private set
@@ -255,6 +269,7 @@ class Javi {
         goal = Float.NaN
         leaving = false
         carrying = false
+        wantVar = 0
         val r = Random.nextFloat()
         dur = when (n) {
             St.WALK -> 5f + r * 5f
@@ -281,6 +296,8 @@ class Javi {
             St.DROP -> 0.9f
             St.BOX -> 14f + r * 6f
             St.STARE -> 7f
+            St.POOP -> 2.8f
+            St.COVER -> 2.6f
             St.CLIMB -> 9f
             St.HELD, St.FALL, St.SLIDE, St.BATH -> 99999f
         }
@@ -402,6 +419,38 @@ class Javi {
         if (st == St.WALK || st == St.SIT || st == St.GROOM || st == St.STRETCH || st == St.BEG) {
             set(St.WATCH)
         }
+    }
+
+    /** Hace caca: se agacha, y después se da vuelta y la tapa. */
+    fun startPoop(): Boolean {
+        if (!idle) return false
+        set(St.POOP)
+        return true
+    }
+
+    /** 1 cuando acaba de hacer, 2 cuando terminó de taparla; si no, 0. Se lee una sola vez. */
+    fun takePoopEvent(): Int {
+        val e = poopEvent
+        poopEvent = 0
+        return e
+    }
+
+    /** true una sola vez, cuando acaba de lavarse solo. */
+    fun takeGroomed(): Boolean {
+        val g = groomedFlag
+        groomedFlag = false
+        return g
+    }
+
+    /** Cuánto avanzó tapando (0 a 1). */
+    val coverProgress: Float
+        get() = if (st == St.COVER) ((now - t0) / dur).coerceIn(0f, 1f) else 0f
+
+    /** Se sienta mirándote y pide algo con un globito. */
+    fun ask(what: Int) {
+        if (!idle) return
+        set(St.BEG)
+        wantVar = what
     }
 
     /** Se mete en una cajita y espía. */
@@ -570,7 +619,21 @@ class Javi {
         }
         when (st) {
             St.EAT -> { set(St.WASH); return }
-            St.WASH, St.RUB -> { set(St.PURR); return }
+            St.WASH -> { groomedFlag = true; set(St.PURR); return }
+            St.RUB -> { set(St.PURR); return }
+            St.GROOM -> groomedFlag = true
+            St.POOP -> {
+                poopEvent = 1
+                dir = -dir
+                set(St.COVER)
+                return
+            }
+            St.COVER -> {
+                poopEvent = 2
+                dir = -dir
+                set(St.WALK)
+                return
+            }
             St.KNEAD -> { set(St.SLEEP); return }
             St.SLEEP -> { set(St.YAWN); return }
             St.STARE -> { set(St.SNEEZE); return }
@@ -579,6 +642,10 @@ class Javi {
         }
         if (st != St.WALK) {
             set(St.WALK)
+            return
+        }
+        if (needs != 0 && Random.nextFloat() < 0.35f) {
+            ask(needs)
             return
         }
         val r = Random.nextFloat()
@@ -662,7 +729,8 @@ class Javi {
             St.RUB -> P_RUB
             St.HANG, St.SLIDE, St.CLIMB -> P_HANG
             St.WATCH -> if (flyFollow && abs(flyX - x) > 115f) P_WALK else P_WATCH
-            St.KNEAD -> P_KNEAD
+            St.KNEAD, St.COVER -> P_KNEAD
+            St.POOP -> P_POOP
             St.YAWN, St.SNEEZE -> P_SIT
             St.WASH -> P_GROOM
             St.DROP -> P_EAT
@@ -730,6 +798,8 @@ class Javi {
         wWash = toward(wWash, st == St.WASH, wf)
         wSwat = toward(wSwat, st == St.SWAT, wf)
         wBox = toward(wBox, st == St.BOX, wf)
+        wCover = toward(wCover, st == St.COVER, wf)
+        want = if (st == St.BEG) wantVar else 0
         wReach = toward(wReach, st == St.REACH, wf)
         wClimb = toward(wClimb, st == St.CLIMB, wf)
         // Ángulo de la mirada hacia la luciérnaga (negativo = hacia arriba)
@@ -768,10 +838,11 @@ class Javi {
         val cl = sin(now * 8f) * wClimb
         val swat = 0.7f * wReach + 0.6f * wClimb
         bl1 = s[BL1] + sw + sin(now * 2.2f) * 7f * wHang - cl * 14f
-        fl2 = s[FL2] + sw + sin(now * 9f + 2.2f) * 13f * swat - cl * 8f - sin(now * 6f) * 13f * wKnead
+        fl2 = s[FL2] + sw + sin(now * 9f + 2.2f) * 13f * swat - cl * 8f - sin(now * 6f) * 13f * wKnead - sin(now * 11f) * 20f * wCover
         bl2 = s[BL2] - sw - sin(now * 2.2f + 0.6f) * 7f * wHang + cl * 14f
         fl1 = s[FL1] - sw + g * 8f + sin(now * 9f) * 15f * swat + cl * 8f +
-            sin(now * 6f) * 13f * wKnead + (sin(now * 5f) * 14f - 6f) * wWash +
+            sin(now * 6f) * 13f * wKnead + sin(now * 11f) * 20f * wCover +
+            (sin(now * 5f) * 14f - 6f) * wWash +
             (sin(now * 7f) * 22f - 8f) * wSwat
         val bob = -abs(sin(p)) * 1.6f * wWalk + sin(now * 1.8f) * 0.9f * wSleep
         py = s[PY] + bob + 3f * snS

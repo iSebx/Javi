@@ -202,8 +202,11 @@ class MainActivity : Activity() {
     @SuppressLint("SetTextI18n")
     private fun refresh() {
         toggle.text = if (PetService.running) "Guardar a Javi" else "Sacar a Javi a la pantalla"
-        info.text = "Mimos: ${Store.mimos(this)}   ·   Comidas: ${Store.comidas(this)}" +
-            "   ·   Regalitos: ${Store.regalos(this)}"
+        Care.load(this)
+        info.text = "${Care.mood}\n" +
+            "Comida ${(Care.food * 100).toInt()}%  ·  Diversión ${(Care.play * 100).toInt()}%  ·  " +
+            "Limpieza ${(Care.clean * 100).toInt()}%\n" +
+            "Mimos: ${Store.mimos(this)}  ·  Regalitos: ${Store.regalos(this)}"
         val enabled = Settings.Secure.getString(
             contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
         ) ?: ""
@@ -225,6 +228,10 @@ class MainActivity : Activity() {
 
     private fun feed(kind: Int) {
         javi.feed(kind)
+        if (!PetService.running) {
+            if (kind == Props.AGUA) Care.drink() else Care.feed(kind == Props.LECHE)
+            Care.save(this)
+        }
         if (kind != Props.AGUA) Store.addComida(this)
         send(PetService.ACTION_FEED, kind)
         refresh()
