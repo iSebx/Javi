@@ -10,12 +10,25 @@ import kotlin.random.Random
  * horas y tienen un piso: nunca llegan a cero ni le pasa nada malo; lo peor
  * que ocurre es que Javi pide lo que le falta.
  */
-object Care {
-    const val FLOOR = 0.15f
-    const val WANT_NONE = 0
-    const val WANT_FOOD = 1
-    const val WANT_PLAY = 2
-    const val WANT_BATH = 3
+class Care(val id: Long) {
+    companion object {
+        const val FLOOR = 0.15f
+        const val WANT_NONE = 0
+        const val WANT_FOOD = 1
+        const val WANT_PLAY = 2
+        const val WANT_BATH = 3
+
+        private fun prefs(c: Context) = c.getSharedPreferences("javi_care", Context.MODE_PRIVATE)
+
+        /**
+         * Marca "ahora" como último momento visto, sin descontar nada. Se usa al
+         * sacar un gato guardado a la pantalla: mientras estuvo guardado no le
+         * bajaron las barras.
+         */
+        fun touch(c: Context, id: Long) {
+            prefs(c).edit().putLong("last_$id", System.currentTimeMillis()).apply()
+        }
+    }
 
     var food = 0.8f
         private set
@@ -123,21 +136,21 @@ object Care {
             else -> if (happy) "Está feliz" else "Está contento"
         }
 
-    private fun prefs(c: Context) = c.getSharedPreferences("javi_care", Context.MODE_PRIVATE)
-
     /** Carga lo guardado y descuenta el tiempo que pasó desde entonces. */
     fun load(c: Context) {
         val p = prefs(c)
         if (!loaded) {
-            food = p.getFloat("food", food)
-            play = p.getFloat("play", play)
-            clean = p.getFloat("clean", clean)
-            water = p.getFloat("water", water)
-            meals = p.getInt("meals", meals)
-            poopIn = p.getFloat("poopIn", poopIn)
+            // El primer gato hereda lo que había antes de que hubiera varios
+            val old = id == 1L
+            food = p.getFloat("food_$id", if (old) p.getFloat("food", food) else food)
+            play = p.getFloat("play_$id", if (old) p.getFloat("play", play) else play)
+            clean = p.getFloat("clean_$id", if (old) p.getFloat("clean", clean) else clean)
+            water = p.getFloat("water_$id", if (old) p.getFloat("water", water) else water)
+            meals = p.getInt("meals_$id", if (old) p.getInt("meals", meals) else meals)
+            poopIn = p.getFloat("poopIn_$id", if (old) p.getFloat("poopIn", poopIn) else poopIn)
             loaded = true
         }
-        val last = p.getLong("last", 0L)
+        val last = p.getLong("last_$id", if (id == 1L) p.getLong("last", 0L) else 0L)
         val now = System.currentTimeMillis()
         if (last in 1 until now) {
             tick(min((now - last) / 1000f, 14f * 24f * 3600f))
@@ -147,9 +160,9 @@ object Care {
 
     fun save(c: Context) {
         prefs(c).edit()
-            .putFloat("food", food).putFloat("play", play).putFloat("clean", clean)
-            .putFloat("water", water).putInt("meals", meals).putFloat("poopIn", poopIn)
-            .putLong("last", System.currentTimeMillis())
+            .putFloat("food_$id", food).putFloat("play_$id", play).putFloat("clean_$id", clean)
+            .putFloat("water_$id", water).putInt("meals_$id", meals).putFloat("poopIn_$id", poopIn)
+            .putLong("last_$id", System.currentTimeMillis())
             .apply()
     }
 }

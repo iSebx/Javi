@@ -99,20 +99,61 @@ object CatStore {
         if (list.size <= 1) return
         list.removeAll { it.id == id }
         saveAll(c, list)
-        if (activeId(c) == id) setActive(c, list[0].id)
+        val ids = screenIds(c).filter { it != id }
+        saveScreen(c, if (ids.isEmpty()) listOf(list[0].id) else ids)
     }
 
     fun newId(c: Context): Long = (all(c).maxOfOrNull { it.id } ?: 0L) + 1L
 
-    fun activeId(c: Context): Long = prefs(c).getLong("active", 1L)
+    const val MAX_ON_SCREEN = 3
 
-    fun setActive(c: Context, id: Long) {
-        prefs(c).edit().putLong("active", id).apply()
+    private fun saveScreen(c: Context, ids: List<Long>) {
+        prefs(c).edit().putString("screen", ids.joinToString(",")).apply()
     }
 
-    /** El gato que está (o va a estar) en pantalla. */
-    fun active(c: Context): Cat {
+    /** Qué gatos salen a la pantalla (hasta tres), en orden. Nunca queda vacío. */
+    fun screenIds(c: Context): List<Long> {
         val list = all(c)
-        return list.firstOrNull { it.id == activeId(c) } ?: list[0]
+        val raw = prefs(c).getString("screen", null)
+        val ids = if (raw == null) {
+            // Antes había un solo gato "elegido"
+            listOf(prefs(c).getLong("active", 1L))
+        } else {
+            raw.split(",").mapNotNull { it.trim().toLongOrNull() }
+        }
+        val valid = ids.filter { id -> list.any { it.id == id } }.distinct().take(MAX_ON_SCREEN)
+        return if (valid.isEmpty()) listOf(list[0].id) else valid
     }
+
+    fun isOnScreen(c: Context, id: Long): Boolean = screenIds(c).contains(id)
+
+    /**
+     * Saca un gato a la pantalla o lo guarda. Devuelve false si no se pudo:
+     * ya hay tres afuera, o era el último que quedaba.
+     */
+    fun setOnScreen(c: Context, id: Long, on: Boolean): Boolean {
+        val ids = screenIds(c).toMutableList()
+        if (on) {
+            if (ids.contains(id)) return true
+            if (ids.size >= MAX_ON_SCREEN) return false
+            ids.add(id)
+            // Mientras estuvo guardado no le bajaron las barras
+            Care.touch(c, id)
+        } else {
+            if (!ids.contains(id)) return true
+            if (ids.size <= 1) return false
+            ids.remove(id)
+        }
+        saveScreen(c, ids)
+        return true
+    }
+
+    /** Los gatos que salen a la pantalla, con su aspecto. */
+    fun onScreen(c: Context): List<Cat> {
+        val list = all(c)
+        return screenIds(c).mapNotNull { id -> list.firstOrNull { it.id == id } }
+    }
+
+    /** El primero de los que están en pantalla (el que muestra la casita). */
+    fun active(c: Context): Cat = onScreen(c)[0]
 }

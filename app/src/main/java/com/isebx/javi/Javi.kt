@@ -451,6 +451,19 @@ class Javi {
     val coverProgress: Float
         get() = if (st == St.COVER) ((now - t0) / dur).coerceIn(0f, 1f) else 0f
 
+    /** Se cruzó con otro gato: se sienta mirándolo, contento. */
+    fun greet(face: Float) {
+        if (!idle) return
+        set(St.SIT)
+        dir = if (face >= 0f) 1f else -1f
+        loveT = 2.5f
+    }
+
+    /** Bostezo contagiado. */
+    fun yawnNow() {
+        if (idle) set(St.YAWN)
+    }
+
     /** Se sienta mirándote y pide algo con un globito. */
     fun ask(what: Int) {
         if (!idle) return

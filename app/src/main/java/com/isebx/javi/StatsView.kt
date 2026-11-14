@@ -10,7 +10,12 @@ import android.view.View
 
 /** Tarjeta con cómo está Javi: comida, diversión y limpieza. Se cierra tocando. */
 @SuppressLint("ViewConstructor")
-class StatsView(context: Context, private val d: Float) : View(context) {
+class StatsView(
+    context: Context,
+    private val care: Care,
+    private val name: String,
+    private val d: Float
+) : View(context) {
 
     var onExit: (() -> Unit)? = null
 
@@ -54,7 +59,7 @@ class StatsView(context: Context, private val d: Float) : View(context) {
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         val w = minOf(width - 40f * d, 320f * d)
-        val h = 270f * d
+        val h = 284f * d
         val x0 = (width - w) / 2f
         val y0 = (height - h) / 2f
         fill.color = 0xFFFFF7EA.toInt()
@@ -63,12 +68,13 @@ class StatsView(context: Context, private val d: Float) : View(context) {
         stroke.color = 0xFF5A4332.toInt()
         canvas.drawRoundRect(x0, y0, x0 + w, y0 + h, 18f * d, 18f * d, stroke)
 
-        canvas.drawText(Care.mood, width / 2f, y0 + 44f * d, title)
+        canvas.drawText(name, width / 2f, y0 + 40f * d, title)
+        canvas.drawText(care.mood, width / 2f, y0 + 60f * d, small)
         val left = x0 + 22f * d
         val right = x0 + w - 22f * d
-        row(canvas, left, right, y0 + 92f * d, Props.POLLO, "Comida", Care.food, 0xFFE8893A.toInt())
-        row(canvas, left, right, y0 + 146f * d, Props.YARN, "Diversión", Care.play, 0xFFD9627A.toInt())
-        row(canvas, left, right, y0 + 200f * d, Props.SHOWER, "Limpieza", Care.clean, 0xFF6FA8DC.toInt())
+        row(canvas, left, right, y0 + 104f * d, Props.POLLO, "Comida", care.food, 0xFFE8893A.toInt())
+        row(canvas, left, right, y0 + 156f * d, Props.YARN, "Diversión", care.play, 0xFFD9627A.toInt())
+        row(canvas, left, right, y0 + 208f * d, Props.SHOWER, "Limpieza", care.clean, 0xFF6FA8DC.toInt())
         canvas.drawText("Tocá para cerrar", width / 2f, y0 + h - 18f * d, small)
     }
 

@@ -217,14 +217,18 @@ class MainActivity : Activity() {
 
     @SuppressLint("SetTextI18n")
     private fun refresh() {
-        toggle.text = if (PetService.running) "Guardar a Javi" else "Sacar a Javi a la pantalla"
-        look = CatStore.active(this).look
+        val cat = CatStore.active(this)
+        val out = CatStore.onScreen(this)
+        val who = if (out.size == 1) "a ${out[0].look.name}" else "a los gatos"
+        toggle.text = if (PetService.running) "Guardar $who" else "Sacar $who a la pantalla"
+        look = cat.look
         preview.look = look
         titleView.text = look.name
-        Care.load(this)
-        info.text = "${Care.mood}\n" +
-            "Comida ${(Care.food * 100).toInt()}%  ·  Diversión ${(Care.play * 100).toInt()}%  ·  " +
-            "Limpieza ${(Care.clean * 100).toInt()}%\n" +
+        val care = Care(cat.id)
+        care.load(this)
+        info.text = "${care.mood}\n" +
+            "Comida ${(care.food * 100).toInt()}%  ·  Diversión ${(care.play * 100).toInt()}%  ·  " +
+            "Limpieza ${(care.clean * 100).toInt()}%\n" +
             "Mimos: ${Store.mimos(this)}  ·  Regalitos: ${Store.regalos(this)}"
         val enabled = Settings.Secure.getString(
             contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
@@ -248,8 +252,10 @@ class MainActivity : Activity() {
     private fun feed(kind: Int) {
         javi.feed(kind)
         if (!PetService.running) {
-            if (kind == Props.AGUA) Care.drink() else Care.feed(kind == Props.LECHE)
-            Care.save(this)
+            val care = Care(CatStore.active(this).id)
+            care.load(this)
+            if (kind == Props.AGUA) care.drink() else care.feed(kind == Props.LECHE)
+            care.save(this)
         }
         if (kind != Props.AGUA) Store.addComida(this)
         send(PetService.ACTION_FEED, kind)

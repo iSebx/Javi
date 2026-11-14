@@ -13,6 +13,7 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import android.widget.Toast
 
 /** La lista de gatos: elegir cuál sale a la pantalla, editarlos o crear uno nuevo. */
 class CatsActivity : Activity() {
@@ -40,6 +41,11 @@ class CatsActivity : Activity() {
             textSize = 28f
             setTextColor(Ui.BROWN)
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        })
+        root.addView(TextView(this).apply {
+            text = "Pueden salir hasta tres juntos a la pantalla"
+            textSize = 14f
+            setTextColor(0xFF8A7460.toInt())
             setPadding(0, 0, 0, dp(8f))
         })
         col = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
@@ -65,7 +71,7 @@ class CatsActivity : Activity() {
     @SuppressLint("SetTextI18n")
     private fun fill() {
         col.removeAllViews()
-        val active = CatStore.activeId(this)
+        val out = CatStore.screenIds(this)
         val unit = resources.displayMetrics.density * 0.5f
         val cats = CatStore.all(this)
         val many = cats.size > 1
@@ -77,7 +83,7 @@ class CatsActivity : Activity() {
                 val bg = GradientDrawable()
                 bg.cornerRadius = dp(16f).toFloat()
                 bg.setColor(Ui.CARD)
-                if (cat.id == active) bg.setStroke(dp(2f), Ui.BROWN)
+                if (out.contains(cat.id)) bg.setStroke(dp(2f), Ui.BROWN)
                 background = bg
             }
             row.addView(CatThumb(this, cat.look, unit), LinearLayout.LayoutParams(dp(92f), dp(86f)))
@@ -92,24 +98,27 @@ class CatsActivity : Activity() {
                 typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             })
             texts.addView(TextView(this).apply {
-                text = if (cat.id == active) "Es el que sale a la pantalla" else "Guardado"
+                text = if (out.contains(cat.id)) "En pantalla" else "Guardado"
                 textSize = 13f
                 setTextColor(0xFF8A7460.toInt())
             })
             row.addView(texts, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
             val buttons = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-            if (cat.id != active) {
+            val isOut = out.contains(cat.id)
+            if (!isOut || out.size > 1) {
                 buttons.addView(Button(this).apply {
-                    text = "Elegir"
+                    text = if (isOut) "Guardar" else "Sacar"
                     setAllCaps(false)
                     textSize = 13f
                     setOnClickListener {
-                        CatStore.setActive(this@CatsActivity, cat.id)
-                        if (PetService.running) {
-                            startService(
-                                Intent(this@CatsActivity, PetService::class.java)
-                                    .setAction(PetService.ACTION_REFRESH)
-                            )
+                        if (CatStore.setOnScreen(this@CatsActivity, cat.id, !isOut)) {
+                            refreshService()
+                        } else {
+                            Toast.makeText(
+                                this@CatsActivity,
+                                "Pueden salir hasta tres a la vez. Guardá uno primero.",
+                                Toast.LENGTH_LONG
+                            ).show()
                         }
                         fill()
                     }
@@ -138,6 +147,12 @@ class CatsActivity : Activity() {
             col.addView(row, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply { bottomMargin = dp(10f) })
+        }
+    }
+
+    private fun refreshService() {
+        if (PetService.running) {
+            startService(Intent(this, PetService::class.java).setAction(PetService.ACTION_REFRESH))
         }
     }
 
