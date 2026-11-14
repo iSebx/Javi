@@ -7,6 +7,7 @@ import android.content.Intent
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
+import android.provider.Settings
 import android.view.Gravity
 import android.view.View
 import android.widget.Button
@@ -150,9 +151,18 @@ class CatsActivity : Activity() {
         }
     }
 
+    /** Avisa a los gatos en pantalla del cambio; si no había ninguno afuera, los saca. */
     private fun refreshService() {
         if (PetService.running) {
             startService(Intent(this, PetService::class.java).setAction(PetService.ACTION_REFRESH))
+        } else if (Settings.canDrawOverlays(this)) {
+            startForegroundService(Intent(this, PetService::class.java))
+        } else {
+            Toast.makeText(
+                this,
+                "Para que salgan, tocá \"Sacar a la pantalla\" en la casita y dales el permiso",
+                Toast.LENGTH_LONG
+            ).show()
         }
     }
 
