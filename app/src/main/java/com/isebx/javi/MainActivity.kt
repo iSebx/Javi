@@ -160,9 +160,14 @@ class MainActivity : Activity() {
             setAllCaps(false)
             textSize = 14f
             setOnClickListener {
-                Store.setCollar(this@MainActivity, !Store.collar(this@MainActivity))
-                send(PetService.ACTION_REFRESH)
-                refresh()
+                AlertDialog.Builder(this@MainActivity)
+                    .setTitle("Collar")
+                    .setItems(Store.COLLAR_NAMES) { _, i ->
+                        Store.setCollarIndex(this@MainActivity, i)
+                        send(PetService.ACTION_REFRESH)
+                        refresh()
+                    }
+                    .show()
             }
         }
         root.addView(
@@ -221,7 +226,7 @@ class MainActivity : Activity() {
     private fun refresh() {
         toggle.text = if (PetService.running) "Guardar a Javi" else "Sacar a Javi a la pantalla"
         javi.collar = Store.collar(this)
-        collarBtn.text = if (javi.collar) "Collar negro: puesto" else "Collar negro: sin collar"
+        collarBtn.text = "Collar: " + Store.COLLAR_NAMES[Store.collarIndex(this)]
         Care.load(this)
         info.text = "${Care.mood}\n" +
             "Comida ${(Care.food * 100).toInt()}%  ·  Diversión ${(Care.play * 100).toInt()}%  ·  " +

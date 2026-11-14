@@ -243,9 +243,9 @@ class JaviPainter {
         fill.color = furDark
         c.drawPath(backEarLIn, fill)
         c.drawPath(backEarRIn, fill)
-        if (j.collar) {
+        if (j.collar != 0) {
             stroke.strokeWidth = 5f
-            stroke.color = 0xFF1F1B1A.toInt()
+            stroke.color = j.collar
             c.drawArc(-31f, -124f, 31f, -67f, 25f, 130f, false, stroke)
         }
         fill.color = fur
@@ -333,10 +333,10 @@ class JaviPainter {
         fill.color = pink
         c.drawPath(earLIn, fill)
         c.drawPath(earRIn, fill)
-        if (j.collar) {
+        if (j.collar != 0) {
             // Collar negro, asomando bajo el mentón
             stroke.strokeWidth = 5f
-            stroke.color = 0xFF1F1B1A.toInt()
+            stroke.color = j.collar
             c.drawArc(-31f, -26f, 31f, 33f, 55f, 95f, false, stroke)
         }
         fill.color = fur

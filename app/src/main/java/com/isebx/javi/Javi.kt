@@ -201,8 +201,8 @@ class Javi {
     /** Estornudo: el soplidito (0 a 1). */
     var puff = 0f; private set
 
-    /** Lleva el collar negro, en su recuerdo. */
-    var collar = false
+    /** Color del collar (ARGB), o 0 si no lleva. El negro es en su recuerdo. */
+    var collar = 0
 
     /** Qué tan sucio se ve (0 a 1). Lo pone quien lo cuida. */
     var dirt = 0f

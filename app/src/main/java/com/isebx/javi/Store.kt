@@ -28,12 +28,23 @@ object Store {
         prefs(c).edit().putInt("regalos", regalos(c) + 1).apply()
     }
 
-    /** Collar negro en recuerdo. Viene puesto. */
-    fun collar(c: Context): Boolean = prefs(c).getBoolean("collar", true)
+    /** Collares: es optativo y se elige el color. El negro es en su recuerdo. */
+    val COLLAR_NAMES = arrayOf("sin collar", "negro", "rojo", "azul", "verde", "rosa", "violeta")
+    private val COLLAR_COLORS = intArrayOf(
+        0, 0xFF1F1B1A.toInt(), 0xFFC8443C.toInt(), 0xFF3F73C8.toInt(),
+        0xFF3F9B63.toInt(), 0xFFE07AA0.toInt(), 0xFF7E5BC2.toInt()
+    )
 
-    fun setCollar(c: Context, on: Boolean) {
-        prefs(c).edit().putBoolean("collar", on).apply()
+    /** Cuál lleva puesto (posición en COLLAR_NAMES). Javi viene con el negro. */
+    fun collarIndex(c: Context): Int =
+        prefs(c).getInt("collarColor", 1).coerceIn(0, COLLAR_COLORS.size - 1)
+
+    fun setCollarIndex(c: Context, i: Int) {
+        prefs(c).edit().putInt("collarColor", i.coerceIn(0, COLLAR_COLORS.size - 1)).apply()
     }
+
+    /** Color del collar puesto (ARGB), o 0 si no lleva. */
+    fun collar(c: Context): Int = COLLAR_COLORS[collarIndex(c)]
 
     const val SIZE_MIN = 0.35f
     const val SIZE_MAX = 0.95f
